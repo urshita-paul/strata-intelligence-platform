@@ -6,7 +6,7 @@ import { EVENTS, REPORTS, fmtTime, type Report } from "@/lib/demo-data";
 import { PageHeader, Panel, SimulatedTag } from "@/components/strata/ui";
 
 export const Route = createFileRoute("/reports")({
-  validateSearch: (s: Record<string, unknown>): { id?: string } => ({ id: typeof s.id === "string" ? s.id : undefined }),
+  validateSearch: (s: Record<string, unknown>): { id?: string | undefined } => ({ id: typeof s["id"] === "string" ? s["id"] : undefined }),
   head: () => ({
     meta: [
       { title: "AI-generated Reports — STRATA" },
@@ -27,8 +27,8 @@ function ReportsPage() {
   const navigate = useNavigate({ from: "/reports" });
   const [reports, setReports] = useState<Report[]>(REPORTS);
   const [kind, setKind] = useState<Report["kind"]>("Incident Brief");
-  const [eventId, setEventId] = useState(EVENTS[0].id);
-  const current = reports.find((r) => r.id === id) ?? reports[0];
+  const [eventId, setEventId] = useState(EVENTS[0]!.id);
+  const current = reports.find((r) => r.id === id) ?? reports[0]!;
 
   const generate = () => {
     const ev = EVENTS.find((e) => e.id === eventId)!;

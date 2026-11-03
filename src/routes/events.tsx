@@ -9,7 +9,7 @@ import { EventMap } from "@/components/strata/EventMap";
 import { tooltipStyle } from "@/components/strata/ui";
 
 export const Route = createFileRoute("/events")({
-  validateSearch: (s: Record<string, unknown>): { id?: string } => ({ id: typeof s.id === "string" ? s.id : undefined }),
+  validateSearch: (s: Record<string, unknown>): { id?: string | undefined } => ({ id: typeof s["id"] === "string" ? s["id"] : undefined }),
   head: () => ({
     meta: [
       { title: "Event Intelligence — STRATA" },
@@ -27,7 +27,7 @@ function EventsPage() {
   const { id } = Route.useSearch();
   const navigate = useNavigate({ from: "/events" });
   const [q, setQ] = useState("");
-  const ev = getEvent(id ?? "") ?? EVENTS[0];
+  const ev = getEvent(id ?? "") ?? EVENTS[0]!;
   const list = EVENTS.filter((e) => `${e.title} ${e.location} ${e.pollutant}`.toLowerCase().includes(q.toLowerCase()));
   const trend = ev.trend.map((v, i) => ({ t: `T-${(7 - i) * 3}h`, v }));
   const related = WARNINGS.filter((w) => w.eventId === ev.id);

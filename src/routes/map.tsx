@@ -23,7 +23,7 @@ const TYPES: EventType[] = ["Air", "Water", "Soil", "Industrial"];
 function MapPage() {
   const [sev, setSev] = useState<Set<Severity>>(new Set(SEVERITY_ORDER));
   const [types, setTypes] = useState<Set<EventType>>(new Set(TYPES));
-  const [selected, setSelected] = useState<string>(EVENTS[0].id);
+  const [selected, setSelected] = useState<string>(EVENTS[0]!.id);
   const toggle = <T,>(s: Set<T>, v: T) => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n; };
   const filtered = EVENTS.filter((e) => sev.has(e.severity) && types.has(e.type));
   const sel = EVENTS.find((e) => e.id === selected);
