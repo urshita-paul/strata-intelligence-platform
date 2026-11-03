@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { EVENTS, REPORTS, WARNINGS, fmtTime, getEvent } from "@/lib/demo-data";
 import { PageHeader, Panel, SeverityBadge, SimulatedTag } from "@/components/strata/ui";
 import { EventMap } from "@/components/strata/EventMap";
-import { tooltipStyle } from "./index";
+import { tooltipStyle } from "@/components/strata/ui";
 
 export const Route = createFileRoute("/events")({
   validateSearch: (s: Record<string, unknown>): { id?: string } => ({ id: typeof s.id === "string" ? s.id : undefined }),

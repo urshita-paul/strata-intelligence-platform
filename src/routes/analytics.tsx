@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, Pie, PieChart, C
 import { EVENTS, MONTHLY } from "@/lib/demo-data";
 import { FilterChip, PageHeader, Panel, StatCard } from "@/components/strata/ui";
 import { sevVar } from "@/components/strata/ui";
-import { tooltipStyle } from "./index";
+import { tooltipStyle } from "@/components/strata/ui";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({

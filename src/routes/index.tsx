@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Activity, AlertTriangle, Users, Gauge } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AQI_24H, EVENTS, WARNINGS, fmtTime } from "@/lib/demo-data";
-import { PageHeader, Panel, SeverityBadge, StatCard } from "@/components/strata/ui";
+import { PageHeader, Panel, SeverityBadge, StatCard, tooltipStyle } from "@/components/strata/ui";
 import { EventMap } from "@/components/strata/EventMap";
 
 export const Route = createFileRoute("/")({
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/")({
   component: Overview,
 });
 
-export const tooltipStyle = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 };
+
 
 function Overview() {
   const navigate = useNavigate();
