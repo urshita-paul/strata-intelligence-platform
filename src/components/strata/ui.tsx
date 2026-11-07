@@ -3,10 +3,10 @@ import { FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Severity } from "@/lib/demo-data";
 
-export function SimulatedTag({ className }: { className?: string }) {
+export function SimulatedTag({ className, children = "Simulated" }: { className?: string; children?: ReactNode }) {
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-sm border border-sim/40 bg-sim/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-sim", className)}>
-      <FlaskConical className="h-3 w-3" /> Simulated
+      <FlaskConical className="h-3 w-3" /> {children}
     </span>
   );
 }

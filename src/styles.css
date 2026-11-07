@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -79,7 +80,7 @@
   --critical: oklch(0.63 0.2 25);
   --high: oklch(0.72 0.16 55);
   --moderate: oklch(0.82 0.13 90);
-  --low: oklch(0.72 0.09 190);
+  --low: oklch(0.75 0.16 155);
   --sim: oklch(0.78 0.11 75);
   --chart-1: oklch(0.72 0.09 190);
   --chart-2: oklch(0.72 0.16 55);
@@ -125,3 +126,47 @@
   0% { transform: scale(1); opacity: 0.7; }
   100% { transform: scale(3); opacity: 0; }
 }
+
+.leaflet-container {
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+.leaflet-tile-pane { filter: brightness(0.78) saturate(0.72); }
+.leaflet-control-zoom a {
+  background: var(--popover);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.leaflet-control-zoom a:hover { background: var(--accent); }
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.leaflet-control-attribution a { color: var(--primary); }
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--popover);
+  color: var(--foreground);
+  box-shadow: 0 12px 30px color-mix(in oklab, var(--background) 70%, transparent);
+}
+.leaflet-popup-content-wrapper { border: 1px solid var(--border); border-radius: var(--radius-md); }
+.leaflet-popup-content { margin: 14px; min-width: 220px; }
+.leaflet-popup-close-button { color: var(--muted-foreground); }
+.strata-map-popup__heading { padding-right: 12px; font-size: 13px; font-weight: 600; line-height: 1.35; }
+.strata-map-popup__meta { margin-top: 5px; color: var(--muted-foreground); font-size: 11px; }
+.strata-map-popup__reading { margin-top: 8px; font-family: var(--font-mono); font-size: 11px; }
+.strata-map-popup__action {
+  margin-top: 10px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  padding: 6px 10px;
+  color: var(--primary-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.strata-map-popup__action:hover { opacity: 0.9; }
+.leaflet-interactive:focus { outline: none; }

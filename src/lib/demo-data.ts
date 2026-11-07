@@ -38,6 +38,72 @@ export const EVENTS: PollutionEvent[] = [
   { id: "EVT-2611-005", title: "PM10 dust – Jharia coalfield", type: "Air", pollutant: "PM10", severity: "high", status: "Active", location: "Dhanbad", state: "Jharkhand", lat: 23.75, lon: 86.42, detected: "2026-11-03T01:30:00Z", reading: 286, unit: "µg/m³", threshold: 100, confidence: 0.86, source: "Open-cast mining & coal fires", affectedPop: 410000, summary: "Fugitive dust elevated under dry northwesterly winds.", trend: [150, 170, 200, 230, 255, 270, 280, 286] },
 ];
 
+export const DEMO_LAST_UPDATED = "2026-11-03T11:00:00Z";
+
+export const RISK_SCORES: Record<string, number> = {
+  "EVT-2611-014": 96,
+  "EVT-2611-013": 84,
+  "EVT-2611-012": 78,
+  "EVT-2611-011": 61,
+  "EVT-2611-010": 58,
+  "EVT-2611-009": 93,
+  "EVT-2611-008": 72,
+  "EVT-2611-007": 35,
+  "EVT-2611-006": 55,
+  "EVT-2611-005": 76,
+};
+export const getRiskScore = (event: PollutionEvent) => RISK_SCORES[event.id] ?? 0;
+
+export const GEOGRAPHIC_REGIONS = ["All India", "North", "South", "East", "West", "Central"] as const;
+export type GeographicRegion = (typeof GEOGRAPHIC_REGIONS)[number];
+const STATE_REGION: Record<string, Exclude<GeographicRegion, "All India">> = {
+  Delhi: "North",
+  "Uttar Pradesh": "North",
+  Karnataka: "South",
+  "Tamil Nadu": "South",
+  "West Bengal": "East",
+  Jharkhand: "East",
+  Maharashtra: "West",
+  Gujarat: "West",
+  "Madhya Pradesh": "Central",
+};
+export const eventInRegion = (event: PollutionEvent, region: GeographicRegion) =>
+  region === "All India" || STATE_REGION[event.state] === region;
+
+export type TrendPeriod = "24h" | "7d" | "30d";
+export interface PollutionTrendPoint {
+  label: string;
+  pm25: number;
+  pm10: number;
+  no2: number;
+}
+
+// Deterministic demonstration series for Delhi NCR; periods always render the same values.
+export function getPollutionTrends(period: TrendPeriod): PollutionTrendPoint[] {
+  const count = period === "24h" ? 24 : period === "7d" ? 7 : 30;
+  const end = Date.UTC(2026, 10, 3, 11);
+  const step = period === "24h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  return Array.from({ length: count }, (_, i) => {
+    const time = end - (count - 1 - i) * step;
+    const date = new Date(time);
+    const daily = period !== "24h";
+    const wave = Math.sin((i - (daily ? 1 : 4)) / (daily ? 1.7 : 4));
+    const secondary = Math.cos(i / (daily ? 2.4 : 5));
+    const slope = period === "24h" ? i * 7.2 : period === "7d" ? i * 9 : i * 2.2;
+    const pm25 = Math.round((daily ? 142 : 192) + 48 * wave + 18 * secondary + slope);
+    const pm10 = Math.round(pm25 * 1.42 + 24 + 12 * Math.cos(i / 3));
+    const no2 = Math.round((daily ? 62 : 54) + 18 * Math.sin(i / (daily ? 2 : 4.5)) + (daily ? i * 1.4 : i * 1.1));
+    return {
+      label: period === "24h"
+        ? `${String(date.getUTCHours()).padStart(2, "0")}:00`
+        : date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }),
+      pm25,
+      pm10,
+      no2,
+    };
+  });
+}
+
 export interface Warning {
   id: string;
   title: string;
