@@ -1,104 +1,689 @@
-import { useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
-import { FileText } from "lucide-react";
-import { toast } from "sonner";
-import { EVENTS, REPORTS, WARNINGS, fmtTime, getEvent } from "@/lib/demo-data";
-import { PageHeader, Panel, SeverityBadge, SimulatedTag } from "@/components/strata/ui";
-import { EventMap } from "@/components/strata/EventMap";
-import { tooltipStyle } from "@/components/strata/ui";
+
+import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Activity,
+  Flame,
+  Satellite,
+  Search,
+  MapPinned,
+} from "lucide-react";
+import type { Station } from "@/components/strata/LiveDashboardMap";
+import {
+  FilterChip,
+  PageHeader,
+  Panel,
+  StatCard,
+} from "@/components/strata/ui";
+
+const API =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000";
+
+type Dataset = "CPCB" | "Sentinel-5P" | "VIIRS";
+
+type SatellitePoint = {
+  point_id: string;
+  grid_lat: number;
+  grid_lon: number;
+  pollutant: string;
+  unit: string;
+  window_start: string;
+  window_end_exclusive: string;
+  anomaly_difference: number | null;
+  anomaly_z_score: number | null;
+  anomaly_direction: string | null;
+  score_available: boolean;
+  negative_retrieval: boolean;
+};
+
+type Fire = {
+  latitude: number;
+  longitude: number;
+  date: string;
+  acq_time: string;
+  satellite: string;
+  confidence: string;
+  frp: number;
+  daynight: string;
+  type: number;
+};
+
+type ObservationRecord = Station | SatellitePoint | Fire;
+
+type ObservationRow = {
+  key: string;
+  title: string;
+  subtitle: string;
+  value: string;
+  meta: string;
+  record: ObservationRecord;
+};
 
 export const Route = createFileRoute("/events")({
-  validateSearch: (s: Record<string, unknown>): { id?: string | undefined } => ({ id: typeof s["id"] === "string" ? s["id"] : undefined }),
   head: () => ({
     meta: [
-      { title: "Event Intelligence — STRATA" },
-      { name: "description", content: "Deep-dive intelligence on individual pollution events: readings, attribution and impact." },
-      { property: "og:title", content: "Event Intelligence — STRATA" },
-      { property: "og:description", content: "Deep-dive intelligence on individual pollution events." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      { title: "Environmental Observations — STRATA" },
+      {
+        name: "description",
+        content:
+          "Explore CPCB, Sentinel-5P and VIIRS environmental observations.",
+      },
+      {
+        property: "og:title",
+        content: "Environmental Observations — STRATA",
+      },
     ],
   }),
   component: EventsPage,
 });
 
 function EventsPage() {
-  const { id } = Route.useSearch();
-  const navigate = useNavigate({ from: "/events" });
-  const [q, setQ] = useState("");
-  const ev = getEvent(id ?? "") ?? EVENTS[0]!;
-  const list = EVENTS.filter((e) => `${e.title} ${e.location} ${e.pollutant}`.toLowerCase().includes(q.toLowerCase()));
-  const trend = ev.trend.map((v, i) => ({ t: `T-${(7 - i) * 3}h`, v }));
-  const related = WARNINGS.filter((w) => w.eventId === ev.id);
-  const reports = REPORTS.filter((r) => r.eventIds.includes(ev.id));
-  const ratio = ev.reading / ev.threshold;
+  const [dataset, setDataset] = useState<Dataset>("CPCB");
+  const [date, setDate] = useState("2024-11-17");
+  const [pollutant, setPollutant] = useState("PM2.5");
+  const [satellitePollutant, setSatellitePollutant] =
+    useState("NO2");
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+
+  const [stations, setStations] = useState<Station[]>([]);
+  const [satellitePoints, setSatellitePoints] =
+    useState<SatellitePoint[]>([]);
+  const [fires, setFires] = useState<Fire[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadData() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const responses = await Promise.all([
+          fetch(
+            `${API}/api/cpcb?date=${date}&pollutant=${encodeURIComponent(pollutant)}`,
+            { signal: controller.signal }
+          ),
+          fetch(
+            `${API}/api/satellite?pollutant=${satellitePollutant}&window_id=11-12`,
+            { signal: controller.signal }
+          ),
+          fetch(
+            `${API}/api/fires?date=${date}`,
+            { signal: controller.signal }
+          ),
+        ]);
+
+        if (responses.some((response) => !response.ok)) {
+          throw new Error("One or more environmental data requests failed.");
+        }
+
+        const cpcbData = (await responses[0].json()) as {
+          stations?: Station[];
+        };
+
+        const satelliteData = (await responses[1].json()) as {
+          points?: SatellitePoint[];
+        };
+
+        const fireData = (await responses[2].json()) as {
+          detections?: Fire[];
+        };
+
+        setStations(cpcbData.stations ?? []);
+        setSatellitePoints(satelliteData.points ?? []);
+        setFires(fireData.detections ?? []);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load environmental observations."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => controller.abort();
+  }, [date, pollutant, satellitePollutant]);
+
+  const allRows = useMemo<ObservationRow[]>(() => {
+    if (dataset === "CPCB") {
+      return stations.map((station) => ({
+        key: station.station_id,
+        title: station.station_name,
+        subtitle: `${station.city_name}, ${station.state_name}`,
+        value: `${station.mean.toFixed(2)} ${station.unit}`,
+        meta: `${station.n} hourly observations · ${station.coverage_flag.replaceAll("_", " ")}`,
+        record: station,
+      }));
+    }
+
+    if (dataset === "Sentinel-5P") {
+      return satellitePoints.map((point) => ({
+        key: point.point_id,
+        title: point.point_id,
+        subtitle: `${point.grid_lat.toFixed(4)}, ${point.grid_lon.toFixed(4)}`,
+        value:
+          point.anomaly_z_score === null
+            ? "Score unavailable"
+            : `Z-score: ${point.anomaly_z_score.toFixed(3)}`,
+        meta: `${point.pollutant} · ${point.anomaly_direction ?? "Direction unavailable"}`,
+        record: point,
+      }));
+    }
+
+    return fires.map((fire, index) => ({
+      key: `${index}-${fire.date}-${fire.acq_time}-${fire.latitude}-${fire.longitude}`,
+      title: `VIIRS detection ${index + 1}`,
+      subtitle: `${fire.latitude.toFixed(4)}, ${fire.longitude.toFixed(4)}`,
+      value: `${fire.frp.toFixed(2)} MW`,
+      meta: `${fire.date} · ${fire.acq_time} UTC · ${fire.confidence} confidence`,
+      record: fire,
+    }));
+  }, [dataset, stations, satellitePoints, fires]);
+
+  const filteredRows = useMemo(() => {
+    const search = query.trim().toLowerCase();
+
+    if (!search) return allRows;
+
+    return allRows.filter((row) =>
+      `${row.title} ${row.subtitle} ${row.value} ${row.meta}`
+        .toLowerCase()
+        .includes(search)
+    );
+  }, [allRows, query]);
+
+  const selectedRow =
+    filteredRows.find((row) => row.key === selectedId) ??
+    filteredRows[0];
+
+  const displayedRows = filteredRows.slice(0, 100);
+
+  const selectedTotal =
+    dataset === "CPCB"
+      ? stations.length
+      : dataset === "Sentinel-5P"
+        ? satellitePoints.length
+        : fires.length;
+
+  const scoredPoints = satellitePoints.filter(
+    (point) => point.score_available
+  ).length;
 
   return (
     <>
-      <PageHeader title="Event Intelligence" subtitle="Select an event to inspect readings, attribution and impact" />
-      <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
-        <Panel title="Events">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter…" className="mb-3 h-8 w-full rounded-md border bg-surface px-2 text-sm outline-none focus:border-primary" />
-          <ul className="space-y-1">
-            {list.map((e) => (
-              <li key={e.id}>
-                <button onClick={() => navigate({ search: { id: e.id } })} className={`w-full rounded-md border px-2.5 py-2 text-left ${e.id === ev.id ? "border-primary bg-primary/10" : "border-transparent hover:bg-accent"}`}>
-                  <div className="flex items-center justify-between"><span className="font-mono text-[10px] text-muted-foreground">{e.id}</span><SeverityBadge severity={e.severity} /></div>
-                  <div className="mt-1 text-sm leading-snug">{e.title}</div>
-                </button>
-              </li>
+      <PageHeader
+        title="Environmental Observation Intelligence"
+        subtitle="Explore individual measurements, satellite anomalies and fire detections"
+        actions={
+          <Link
+            to="/map"
+            className="rounded-md border px-3 py-2 text-xs text-primary hover:bg-primary/10"
+          >
+            Open multi-source map →
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatCard
+          label="CPCB Stations"
+          value={String(stations.length)}
+          delta={`${pollutant} · ${date}`}
+          icon={<Activity className="h-4 w-4" />}
+        />
+
+        <StatCard
+          label="Satellite Grid Points"
+          value={String(satellitePoints.length)}
+          delta={`${satellitePollutant} · composite observations`}
+          icon={<Satellite className="h-4 w-4" />}
+        />
+
+        <StatCard
+          label="VIIRS Detections"
+          value={String(fires.length)}
+          delta={`Satellite records · ${date}`}
+          icon={<Flame className="h-4 w-4" />}
+        />
+      </div>
+
+      <Panel
+        title="Observation filters"
+        simulated={false}
+        className="mt-4"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {(["CPCB", "Sentinel-5P", "VIIRS"] as Dataset[]).map(
+              (item) => (
+                <FilterChip
+                  key={item}
+                  active={dataset === item}
+                  onClick={() => {
+                    setDataset(item);
+                    setQuery("");
+                    setSelectedId("");
+                  }}
+                >
+                  {item}
+                </FilterChip>
+              )
+            )}
+          </div>
+
+          {(dataset === "CPCB" || dataset === "VIIRS") && (
+            <label className="grid gap-1 text-xs text-muted-foreground">
+              Observation date
+              <input
+                type="date"
+                value={date}
+                min="2024-11-09"
+                max="2024-11-17"
+                onChange={(event) => setDate(event.target.value)}
+                className="h-9 rounded-md border bg-surface px-2 text-foreground"
+              />
+            </label>
+          )}
+
+          {dataset === "CPCB" && (
+            <label className="grid gap-1 text-xs text-muted-foreground">
+              Pollutant
+              <select
+                value={pollutant}
+                onChange={(event) => setPollutant(event.target.value)}
+                className="h-9 rounded-md border bg-surface px-3 text-foreground"
+              >
+                <option>PM2.5</option>
+                <option>PM10</option>
+                <option>NO2</option>
+                <option>CO</option>
+              </select>
+            </label>
+          )}
+
+          {dataset === "Sentinel-5P" && (
+            <label className="grid gap-1 text-xs text-muted-foreground">
+              Satellite pollutant
+              <select
+                value={satellitePollutant}
+                onChange={(event) =>
+                  setSatellitePollutant(event.target.value)
+                }
+                className="h-9 rounded-md border bg-surface px-3 text-foreground"
+              >
+                <option value="NO2">NO2</option>
+                <option value="HCHO">HCHO</option>
+              </select>
+            </label>
+          )}
+
+          {loading && (
+            <span className="text-xs text-muted-foreground">
+              Loading observations...
+            </span>
+          )}
+        </div>
+
+        {error && (
+          <div className="mt-3 rounded-md border border-red-500/40 p-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+      </Panel>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <Panel
+          title={`${dataset} observations`}
+          simulated={false}
+        >
+          <div className="relative mb-3">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search observations..."
+              className="h-9 w-full rounded-md border bg-surface pl-8 pr-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+
+          <div className="mb-3 text-xs text-muted-foreground">
+            Showing {displayedRows.length} of {filteredRows.length} matching records
+            {filteredRows.length > 100 && " · First 100 shown"}
+          </div>
+
+          <div className="max-h-[650px] space-y-1 overflow-y-auto">
+            {displayedRows.map((row) => (
+              <button
+                key={row.key}
+                onClick={() => setSelectedId(row.key)}
+                className={`w-full rounded-md border px-3 py-2.5 text-left transition-colors ${
+                  selectedRow?.key === row.key
+                    ? "border-primary bg-primary/10"
+                    : "border-transparent hover:bg-accent"
+                }`}
+              >
+                <div className="text-sm font-medium leading-snug">
+                  {row.title}
+                </div>
+
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {row.subtitle}
+                </div>
+
+                <div className="mt-2 font-mono text-xs text-primary">
+                  {row.value}
+                </div>
+
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  {row.meta}
+                </div>
+              </button>
             ))}
-          </ul>
-        </Panel>
-        <div className="space-y-4">
-          <div className="rounded-lg border bg-panel p-5">
-            <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-muted-foreground">{ev.id}</span><SeverityBadge severity={ev.severity} /><span className="rounded-sm border px-1.5 py-0.5 text-[10px] uppercase">{ev.status}</span><SimulatedTag /></div>
-            <h2 className="mt-2 text-xl font-semibold">{ev.title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{ev.location}, {ev.state} · detected {fmtTime(ev.detected)}</p>
-            <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[["Reading", `${ev.reading} ${ev.unit}`], ["Exceedance", `${ratio.toFixed(1)}× limit`], ["Exposed pop.", ev.affectedPop.toLocaleString()], ["Attribution conf.", `${Math.round(ev.confidence * 100)}%`]].map(([k, v]) => (
-                <div key={k}><div className="text-xs uppercase tracking-wider text-muted-foreground">{k}</div><div className="mt-1 font-mono text-lg">{v}</div></div>
-              ))}
-            </div>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Panel title={`${ev.pollutant} trend · 24h`}>
-              <div className="h-56">
-                <ResponsiveContainer>
-                  <LineChart data={trend}>
-                    <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                    <XAxis dataKey="t" stroke="var(--muted-foreground)" fontSize={11} />
-                    <YAxis stroke="var(--muted-foreground)" fontSize={11} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <ReferenceLine y={ev.threshold} stroke="var(--critical)" strokeDasharray="4 4" label={{ value: "Limit", fill: "var(--critical)", fontSize: 10 }} />
-                    <Line dataKey="v" name={ev.pollutant} stroke="var(--primary)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+
+            {!loading && filteredRows.length === 0 && (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No matching observations found.
               </div>
-            </Panel>
-            <Panel title="Location">
-              <div className="h-56"><EventMap events={[ev]} selectedId={ev.id} compact /></div>
-            </Panel>
+            )}
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Panel title="Attribution & assessment">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Probable source</div>
-              <div className="mt-1 text-sm">{ev.source}</div>
-              <div className="mt-3 text-xs uppercase tracking-wider text-muted-foreground">Analyst summary</div>
-              <p className="mt-1 text-sm leading-relaxed">{ev.summary}</p>
-              <p className="mt-3 text-[11px] text-muted-foreground">Attribution is placeholder text. Source-apportionment model not yet connected.</p>
-            </Panel>
-            <Panel title="Linked items">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Warnings</div>
-              {related.length ? related.map((w) => <Link key={w.id} to="/warnings" className="mt-1 block text-sm text-primary hover:underline">{w.id} · {w.title}</Link>) : <div className="mt-1 text-sm text-muted-foreground">None</div>}
-              <div className="mt-3 text-xs uppercase tracking-wider text-muted-foreground">Reports</div>
-              {reports.length ? reports.map((r) => <Link key={r.id} to="/reports" search={{ id: r.id }} className="mt-1 block text-sm text-primary hover:underline">{r.id} · {r.title}</Link>) : <div className="mt-1 text-sm text-muted-foreground">None</div>}
-              <button onClick={() => toast.success(`Draft report queued for ${ev.id}`, { description: "Simulated — report generation is not connected yet." })} className="mt-4 inline-flex items-center gap-2 rounded-md border border-primary px-3 py-1.5 text-sm text-primary hover:bg-primary/10"><FileText className="h-4 w-4" /> Generate brief</button>
-            </Panel>
-          </div>
+        </Panel>
+
+        <div className="space-y-4">
+          <Panel
+            title="Selected observation"
+            simulated={false}
+          >
+            {!selectedRow ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                {loading
+                  ? "Loading observation records..."
+                  : "Select an observation to inspect its details."}
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-sm border px-2 py-1 text-[10px] uppercase tracking-wider">
+                    {dataset}
+                  </span>
+
+                  <span className="text-xs text-muted-foreground">
+                    {selectedRow.key}
+                  </span>
+                </div>
+
+                <h2 className="mt-3 text-xl font-semibold">
+                  {selectedRow.title}
+                </h2>
+
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {selectedRow.subtitle}
+                </p>
+
+                {dataset === "CPCB" &&
+                  "station_id" in selectedRow.record && (
+                    <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Reported mean
+                        </div>
+                        <div className="mt-1 font-mono text-lg">
+                          {selectedRow.record.mean.toFixed(2)}{" "}
+                          {selectedRow.record.unit}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Pollutant
+                        </div>
+                        <div className="mt-1 font-mono text-lg">
+                          {selectedRow.record.parameter_name}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Hourly observations
+                        </div>
+                        <div className="mt-1 font-mono text-lg">
+                          {selectedRow.record.n}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Station ID
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.station_id}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          City / State
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.city_name},{" "}
+                          {selectedRow.record.state_name}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Coverage flag
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.coverage_flag.replaceAll(
+                            "_",
+                            " "
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {dataset === "Sentinel-5P" &&
+                  "point_id" in selectedRow.record && (
+                    <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Pollutant
+                        </div>
+                        <div className="mt-1 text-lg">
+                          {selectedRow.record.pollutant}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Anomaly Z-score
+                        </div>
+                        <div className="mt-1 font-mono text-lg">
+                          {selectedRow.record.anomaly_z_score === null
+                            ? "Unavailable"
+                            : selectedRow.record.anomaly_z_score.toFixed(3)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Anomaly difference
+                        </div>
+                        <div className="mt-1 font-mono text-lg">
+                          {selectedRow.record.anomaly_difference ?? "Unavailable"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Direction
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.anomaly_direction ?? "Unavailable"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Score available
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.score_available ? "Yes" : "No"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Negative retrieval
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.negative_retrieval ? "Yes" : "No"}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2 md:col-span-3">
+                        <div className="text-xs text-muted-foreground">
+                          Composite period
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.window_start} to{" "}
+                          {selectedRow.record.window_end_exclusive}
+                          {" "}(end date exclusive)
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {dataset === "VIIRS" &&
+                  "frp" in selectedRow.record && (
+                    <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Detection date
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.date}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Acquisition time
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.acq_time} UTC
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Fire Radiative Power
+                        </div>
+                        <div className="mt-1 font-mono text-lg">
+                          {selectedRow.record.frp.toFixed(2)} MW
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Satellite
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.satellite}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Confidence
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.confidence}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Day / night
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.daynight}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground">
+                          Detection type
+                        </div>
+                        <div className="mt-1 text-sm">
+                          {selectedRow.record.type}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                <div className="mt-5 rounded-md border bg-surface p-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <MapPinned className="h-3.5 w-3.5" />
+                    Geographic coordinates
+                  </div>
+
+                  <div className="mt-2 font-mono text-sm">
+                    {"station_id" in selectedRow.record
+                      ? `${selectedRow.record.latitude}, ${selectedRow.record.longitude}`
+                      : "point_id" in selectedRow.record
+                        ? `${selectedRow.record.grid_lat}, ${selectedRow.record.grid_lon}`
+                        : `${selectedRow.record.latitude}, ${selectedRow.record.longitude}`}
+                  </div>
+
+                  <Link
+                    to="/map"
+                    className="mt-2 inline-block text-xs text-primary hover:underline"
+                  >
+                    Open full environmental map →
+                  </Link>
+                </div>
+              </>
+            )}
+          </Panel>
+
+          <Panel
+            title="Predictive assessment"
+            simulated={false}
+          >
+            <p className="text-sm text-muted-foreground">
+              XGBoost risk classification, future predictions and SHAP
+              explanations are not connected to this observation yet.
+              This section can be populated when the predictive model
+              integration is available.
+            </p>
+          </Panel>
         </div>
       </div>
+
+      <p className="mt-4 text-xs text-muted-foreground">
+        CPCB records represent reported station-level means. Sentinel-5P
+        records represent composite-period grid observations. VIIRS records
+        are satellite detections, not necessarily unique confirmed fires.
+        An observation alone does not establish a confirmed pollution
+        incident, its cause or its impact on population.
+      </p>
     </>
   );
 }
