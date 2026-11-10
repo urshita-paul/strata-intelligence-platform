@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
+  CheckCircle2,
+  Clock3,
+  Database,
+  FileCheck2,
   FileText,
   Flame,
   Printer,
@@ -12,9 +16,12 @@ import {
 import { toast } from "sonner";
 import type { Station } from "@/components/strata/LiveDashboardMap";
 import {
+  DatasetBadge,
+  EmptyState,
   PageHeader,
   Panel,
   StatCard,
+  StatusNotice,
 } from "@/components/strata/ui";
 
 const API =
@@ -136,10 +143,6 @@ function createReportHtml(snapshot: ReportSnapshot): string {
     kind === "Multi-source Summary" ||
     kind === "Sentinel-5P Anomaly Summary";
 
-  const includeFires =
-    kind === "Multi-source Summary" ||
-    kind === "VIIRS Detection Summary";
-
   const observations = stations.reduce(
     (total, station) => total + station.n,
     0
@@ -180,8 +183,7 @@ function createReportHtml(snapshot: ReportSnapshot): string {
 
   const averageFrp =
     fires.length > 0
-      ? fires.reduce((total, fire) => total + fire.frp, 0) /
-        fires.length
+      ? fires.reduce((total, fire) => total + fire.frp, 0) / fires.length
       : null;
 
   const maxFrp =
@@ -362,16 +364,16 @@ function createReportHtml(snapshot: ReportSnapshot): string {
   };
 
   const confidenceSection = confidenceOrder
-    .filter((label) => confidenceCounts[label] > 0)
+    .filter((label) => (confidenceCounts[label] ?? 0) > 0)
     .map((label) => {
-      const count = confidenceCounts[label];
+      const count = confidenceCounts[label] ?? 0;
       const percentage =
         fires.length > 0 ? (count / fires.length) * 100 : 0;
 
       return `
         <div class="bar-row">
           <div class="bar-label"><span>${label}</span><strong>${numberFormat(count)}</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${percentage.toFixed(1)}%;background:${confidenceColors[label]}"></div></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${percentage.toFixed(1)}%;background:${confidenceColors[label] ?? "#94A3B8"}"></div></div>
         </div>
       `;
     })
@@ -478,11 +480,6 @@ function createReportHtml(snapshot: ReportSnapshot): string {
       : includeSatellite
         ? satelliteSection
         : fireSection;
-
-  const secondPageContent =
-    kind === "Multi-source Summary"
-      ? `${satelliteSection}${fireSection}${sourceNotes}`
-      : sourceNotes;
 
   const totalPages = kind === "Multi-source Summary" ? 2 : 1;
 
@@ -746,6 +743,13 @@ export const Route = createFileRoute("/reports")({
           "Professionally formatted environmental reports based on CPCB, Sentinel-5P and VIIRS observations.",
       },
       { property: "og:title", content: "Environmental Reports — STRATA" },
+      {
+        property: "og:description",
+        content:
+          "Generate polished standalone HTML reports and print-ready PDFs from historical environmental observations.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ReportsPage,
@@ -757,8 +761,7 @@ function ReportsPage() {
   const [kind, setKind] = useState<ReportKind>("Multi-source Summary");
 
   const [stations, setStations] = useState<Station[]>([]);
-  const [satellitePoints, setSatellitePoints] =
-    useState<SatellitePoint[]>([]);
+  const [satellitePoints, setSatellitePoints] = useState<SatellitePoint[]>([]);
   const [fires, setFires] = useState<Fire[]>([]);
 
   const [reports, setReports] = useState<GeneratedReport[]>([]);
@@ -813,6 +816,10 @@ function ReportsPage() {
           return;
         }
 
+        setStations([]);
+        setSatellitePoints([]);
+        setFires([]);
+
         setError(
           err instanceof Error
             ? err.message
@@ -825,12 +832,17 @@ function ReportsPage() {
       }
     }
 
-    loadData();
+    void loadData();
 
     return () => controller.abort();
   }, [date, pollutant]);
 
   const generateReport = () => {
+    if (loading || error) {
+      toast.error("Wait until all source datasets are ready.");
+      return;
+    }
+
     const created = new Date().toISOString();
     const id = `STR-${date.replaceAll("-", "")}-${Date.now()
       .toString()
@@ -892,11 +904,17 @@ function ReportsPage() {
   return (
     <div className="space-y-5 pb-8">
       <PageHeader
-        title="Environmental Reports"
-        subtitle="Prepare, inspect and export structured reports from historical environmental observations."
+        eyebrow="Environmental intelligence reporting"
+        title="Reports & Export"
+        subtitle="Turn actual historical observations into polished standalone HTML documents and print-ready PDF reports, with methodology and limitations included."
+        actions={
+          <span className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-zinc-400">
+            <FileCheck2 className="h-4 w-4 text-primary" />
+            A4 · Standalone document
+          </span>
+        }
       />
 
-      {/* Report workspace introduction */}
       <section className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#080B0A] p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-teal-400/[0.08] blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-cyan-500/[0.05] blur-3xl" />
@@ -931,13 +949,14 @@ function ReportsPage() {
         </div>
       </section>
 
-      {/* Source dataset statistics */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
           label="CPCB Stations"
           value={String(stations.length)}
           delta={`${pollutant} · ${date}`}
           icon={<Activity className="h-4 w-4" />}
+          accent="primary"
+          loading={loading}
         />
 
         <StatCard
@@ -945,6 +964,8 @@ function ReportsPage() {
           value={String(satellitePoints.length)}
           delta="Composite-period observations"
           icon={<Satellite className="h-4 w-4" />}
+          accent="satellite"
+          loading={loading}
         />
 
         <StatCard
@@ -952,16 +973,16 @@ function ReportsPage() {
           value={String(fires.length)}
           delta={`Historical records · ${date}`}
           icon={<Flame className="h-4 w-4" />}
+          accent="fire"
+          loading={loading}
         />
       </div>
 
-      {/* Configuration and preview */}
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(300px,0.78fr)_minmax(0,1.75fr)]">
         <div className="min-w-0 space-y-4">
-          {/* Report configuration */}
           <Panel
             title="Report configuration"
-            simulated={false}
+            description="Configure your historical observation report."
             className="border-white/[0.08] bg-[#080808]"
           >
             <div className="mb-4">
@@ -1044,21 +1065,38 @@ function ReportsPage() {
               </div>
 
               <div className="space-y-2.5">
-                <SourceCount
-                  label="CPCB"
-                  count={stations.length}
-                  loading={loading}
-                />
-                <SourceCount
-                  label="Sentinel-5P"
-                  count={satellitePoints.length}
-                  loading={loading}
-                />
-                <SourceCount
-                  label="VIIRS"
-                  count={fires.length}
-                  loading={loading}
-                />
+                {(
+                  [
+                    ["CPCB", stations.length],
+                    ["Sentinel-5P", satellitePoints.length],
+                    ["VIIRS", fires.length],
+                  ] as const
+                ).map(([source, count]) => (
+                  <div
+                    key={source}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <DatasetBadge
+                      dataset={source as "CPCB" | "Sentinel-5P" | "VIIRS"}
+                    />
+
+                    {loading ? (
+                      <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+                        <Clock3 className="h-3 w-3" />
+                        Loading
+                      </span>
+                    ) : error ? (
+                      <span className="text-[10px] text-red-400">
+                        Unavailable
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {count.toLocaleString()} records
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {loading && (
@@ -1068,9 +1106,13 @@ function ReportsPage() {
               )}
 
               {error && (
-                <div className="mt-3 rounded-lg border border-red-500/25 bg-red-500/[0.06] p-2.5 text-xs text-red-300">
+                <StatusNotice
+                  tone="error"
+                  title="Source data unavailable"
+                  className="mt-3"
+                >
                   {error}
-                </div>
+                </StatusNotice>
               )}
             </div>
 
@@ -1089,16 +1131,11 @@ function ReportsPage() {
             </p>
           </Panel>
 
-          {/* Report library */}
           <Panel
             title="Report library"
-            simulated={false}
+            description={`${reports.length} document${reports.length === 1 ? "" : "s"} generated in this session`}
             className="border-white/[0.08] bg-[#080808]"
-            action={
-              <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[10px] text-zinc-400">
-                {reports.length} reports
-              </span>
-            }
+            contentClassName="p-3 sm:p-3"
           >
             {reports.length === 0 ? (
               <div className="rounded-xl border border-dashed border-white/10 py-9 text-center">
@@ -1168,11 +1205,15 @@ function ReportsPage() {
           </Panel>
         </div>
 
-        {/* Document preview */}
         <Panel
           title="Document preview"
-          simulated={false}
+          description={
+            current
+              ? `${current.id} · ${current.kind}`
+              : "Your generated A4 report will appear here."
+          }
           className="min-w-0 border-white/[0.08] bg-[#080808]"
+          contentClassName="p-3 sm:p-3"
           action={
             current ? (
               <button
@@ -1251,10 +1292,9 @@ function ReportsPage() {
         </Panel>
       </div>
 
-      {/* Transparency note */}
       <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
-          <FileText className="h-4 w-4" />
+          <Database className="h-4 w-4" />
         </div>
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
@@ -1268,25 +1308,6 @@ function ReportsPage() {
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function SourceCount({
-  label,
-  count,
-  loading,
-}: {
-  label: string;
-  count: number;
-  loading: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-xs text-zinc-400">{label}</span>
-      <span className="font-mono text-xs font-medium text-zinc-200">
-        {loading ? "—" : count.toLocaleString()}
-      </span>
     </div>
   );
 }

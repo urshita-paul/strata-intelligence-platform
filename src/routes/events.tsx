@@ -3,29 +3,38 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
+  ArrowUpRight,
   CalendarDays,
   ChevronRight,
   Clock3,
+  Crosshair,
   Database,
   Flame,
   Info,
   MapPinned,
   Search,
   Satellite,
+  ShieldAlert,
+  X,
 } from "lucide-react";
 import type { Station } from "@/components/strata/LiveDashboardMap";
 import {
+  DatasetBadge,
+  DatasetIcon,
+  DetailItem,
+  EmptyState,
   FilterChip,
+  LoadingRows,
   PageHeader,
   Panel,
   StatCard,
+  StatusNotice,
+  type Dataset,
 } from "@/components/strata/ui";
 
 const API =
   import.meta.env.VITE_API_BASE_URL ||
   "http://127.0.0.1:8000";
-
-type Dataset = "CPCB" | "Sentinel-5P" | "VIIRS";
 
 const isDataset = (value: unknown): value is Dataset =>
   value === "CPCB" ||
@@ -79,15 +88,28 @@ export const Route = createFileRoute("/events")({
 
   head: () => ({
     meta: [
-      { title: "Environmental Observations — STRATA" },
+      { title: "Event Intelligence — STRATA" },
       {
         name: "description",
         content:
-          "Explore CPCB, Sentinel-5P and VIIRS environmental observations.",
+          "Investigate CPCB, Sentinel-5P and VIIRS environmental observations with detailed source context.",
       },
       {
         property: "og:title",
-        content: "Environmental Observations — STRATA",
+        content: "Event Intelligence — STRATA",
+      },
+      {
+        property: "og:description",
+        content:
+          "Search, select and inspect historical environmental observations across three sources.",
+      },
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
       },
     ],
   }),
@@ -112,14 +134,14 @@ function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Apply global search parameters when navigating from AppShell.
+  // Apply global search parameters from AppShell.
   useEffect(() => {
     setDataset(routeSearch.dataset);
     setQuery(routeSearch.q);
     setSelectedId(routeSearch.id);
   }, [routeSearch.dataset, routeSearch.q, routeSearch.id]);
 
-  // Load observations from the production API.
+  // Retrieve observations from the production API.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -180,12 +202,12 @@ function EventsPage() {
       }
     }
 
-    loadData();
+    void loadData();
 
     return () => controller.abort();
   }, [date, pollutant, satellitePollutant]);
 
-  // Build observation rows for the selected source.
+  // Build the observation list for the selected source.
   const allRows = useMemo<ObservationRow[]>(() => {
     if (dataset === "CPCB") {
       return stations.map((station) => ({
@@ -203,11 +225,12 @@ function EventsPage() {
         key: point.point_id,
         title: point.point_id,
         subtitle: `${point.grid_lat.toFixed(4)}, ${point.grid_lon.toFixed(4)}`,
-        value:
-          point.anomaly_z_score === null
+        value: point.negative_retrieval
+          ? "Negative retrieval flagged"
+          : point.anomaly_z_score === null
             ? "Score unavailable"
             : `Z-score: ${point.anomaly_z_score.toFixed(3)}`,
-        meta: `${point.pollutant} · ${point.anomaly_direction ?? "Direction unavailable"}`,
+        meta: `${point.pollutant} · ${point.anomaly_direction?.replaceAll("_", " ") ?? "Direction unavailable"}`,
         record: point,
       }));
     }
@@ -222,7 +245,7 @@ function EventsPage() {
     }));
   }, [dataset, stations, satellitePoints, fires]);
 
-  // Include record IDs so exact IDs from global search match.
+  // Search across IDs, locations, values and metadata.
   const filteredRows = useMemo(() => {
     const search = query.trim().toLowerCase();
 
@@ -241,12 +264,11 @@ function EventsPage() {
 
   const displayedRows = filteredRows.slice(0, 100);
 
-  const selectedTotal =
-    dataset === "CPCB"
-      ? stations.length
-      : dataset === "Sentinel-5P"
-        ? satellitePoints.length
-        : fires.length;
+  const counts: Record<Dataset, number> = {
+    CPCB: stations.length,
+    "Sentinel-5P": satellitePoints.length,
+    VIIRS: fires.length,
+  };
 
   const scoredPoints = satellitePoints.filter(
     (point) => point.score_available
@@ -255,21 +277,22 @@ function EventsPage() {
   return (
     <div className="space-y-5 pb-8">
       <PageHeader
+        eyebrow="Observation investigation workspace"
         title="Observation Explorer"
-        subtitle="Explore individual measurements, satellite anomalies and fire detections."
+        subtitle="Search and inspect individual ground measurements, atmospheric grid observations and satellite fire detections."
         actions={
           <Link
             to="/map"
             className="group inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2.5 text-xs font-semibold text-primary transition-all hover:border-primary/50 hover:bg-primary/15"
           >
             <MapPinned className="h-4 w-4" />
-            Open multi-source map
-            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            Open geospatial map
+            <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </Link>
         }
       />
 
-      {/* Page introduction */}
+      {/* Introduction */}
       <section className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#080B0A] p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-teal-400/[0.08] blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-cyan-500/[0.05] blur-3xl" />
@@ -295,6 +318,7 @@ function EventsPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Activity className="h-4 w-4" />
             </div>
+
             <div>
               <div className="text-[10px] uppercase tracking-wider text-zinc-500">
                 Active data source
@@ -314,6 +338,8 @@ function EventsPage() {
           value={String(stations.length)}
           delta={`${pollutant} · ${date}`}
           icon={<Activity className="h-4 w-4" />}
+          accent="primary"
+          loading={loading}
         />
 
         <StatCard
@@ -321,6 +347,8 @@ function EventsPage() {
           value={String(satellitePoints.length)}
           delta={`${satellitePollutant} · composite observations`}
           icon={<Satellite className="h-4 w-4" />}
+          accent="satellite"
+          loading={loading}
         />
 
         <StatCard
@@ -328,12 +356,15 @@ function EventsPage() {
           value={String(fires.length)}
           delta={`Satellite records · ${date}`}
           icon={<Flame className="h-4 w-4" />}
+          accent="fire"
+          loading={loading}
         />
       </div>
 
       {/* Filters */}
       <Panel
         title="Data source & filters"
+        description="Choose a dataset and narrow down the historical observation records."
         simulated={false}
         className="border-white/[0.08] bg-[#080808]"
       >
@@ -354,22 +385,20 @@ function EventsPage() {
                   <FilterChip
                     key={item}
                     active={dataset === item}
+                    count={counts[item]}
                     onClick={() => {
                       setDataset(item);
                       setQuery("");
                       setSelectedId("");
                     }}
                   >
-                    {item === "CPCB" && (
-                      <Activity className="mr-1.5 inline h-3.5 w-3.5" />
-                    )}
-                    {item === "Sentinel-5P" && (
-                      <Satellite className="mr-1.5 inline h-3.5 w-3.5" />
-                    )}
-                    {item === "VIIRS" && (
-                      <Flame className="mr-1.5 inline h-3.5 w-3.5" />
-                    )}
-                    {item}
+                    <span className="flex items-center gap-2">
+                      <DatasetIcon
+                        dataset={item}
+                        className="h-3.5 w-3.5"
+                      />
+                      {item}
+                    </span>
                   </FilterChip>
                 )
               )}
@@ -378,13 +407,14 @@ function EventsPage() {
 
           <div className="h-px bg-white/[0.07]" />
 
-          <div className="flex flex-wrap items-end gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {(dataset === "CPCB" || dataset === "VIIRS") && (
-              <label className="grid min-w-[170px] gap-2">
+              <label className="grid gap-2">
                 <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   <CalendarDays className="h-3.5 w-3.5" />
                   Observation date
                 </span>
+
                 <input
                   type="date"
                   value={date}
@@ -397,10 +427,11 @@ function EventsPage() {
             )}
 
             {dataset === "CPCB" && (
-              <label className="grid min-w-[150px] gap-2">
+              <label className="grid gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   Ground pollutant
                 </span>
+
                 <select
                   value={pollutant}
                   onChange={(event) => setPollutant(event.target.value)}
@@ -415,10 +446,11 @@ function EventsPage() {
             )}
 
             {dataset === "Sentinel-5P" && (
-              <label className="grid min-w-[170px] gap-2">
+              <label className="grid gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   Satellite pollutant
                 </span>
+
                 <select
                   value={satellitePollutant}
                   onChange={(event) =>
@@ -426,13 +458,29 @@ function EventsPage() {
                   }
                   className="h-10 rounded-lg border border-white/10 bg-[#101010] px-3 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/60"
                 >
-                  <option value="NO2">NO2</option>
+                  <option value="NO2">NO₂</option>
                   <option value="HCHO">HCHO</option>
                 </select>
               </label>
             )}
 
-            <div className="ml-auto flex min-h-10 items-center gap-2 text-xs text-zinc-500">
+            {dataset === "Sentinel-5P" && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5 text-xs text-zinc-400">
+                <span>Composite period</span>
+                <span className="font-mono font-medium text-zinc-200">
+                  12–18 Nov 2024
+                </span>
+                <span className="text-zinc-600">·</span>
+                <span>Scores:</span>
+                <span className="font-mono font-medium text-primary">
+                  {scoredPoints.toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-4">
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
               {loading ? (
                 <>
                   <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
@@ -441,206 +489,178 @@ function EventsPage() {
               ) : (
                 <>
                   <span className="h-2 w-2 rounded-full bg-primary" />
-                  {selectedTotal.toLocaleString()} records loaded
+                  {counts[dataset].toLocaleString()} records loaded
                 </>
               )}
             </div>
+
+            <span className="text-[10px] text-zinc-600">
+              Historical dataset · November 2024
+            </span>
           </div>
 
-          {dataset === "Sentinel-5P" && (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5 text-xs text-zinc-400">
-              <span>
-                Composite window:{" "}
-                <span className="font-medium text-zinc-200">
-                  12–18 November 2024
-                </span>
-              </span>
-              <span>
-                Scores available:{" "}
-                <span className="font-mono font-medium text-primary">
-                  {scoredPoints.toLocaleString()}
-                </span>
-              </span>
-            </div>
-          )}
-
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[0.06] p-3 text-sm text-red-300">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <StatusNotice
+              tone="error"
+              title="Observation data unavailable"
+            >
               {error}
-            </div>
+            </StatusNotice>
           )}
         </div>
       </Panel>
 
       {/* Observation workspace */}
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(290px,0.85fr)_minmax(0,1.65fr)]">
-        {/* Observation list */}
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(290px,0.85fr)_minmax(0,1.65fr)]">
+        {/* Observation index */}
         <Panel
           title={`${dataset} observations`}
+          description={`${filteredRows.length.toLocaleString()} matching records${filteredRows.length > 100 ? " · first 100 shown" : ""}`}
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
+          contentClassName="p-3 sm:p-4"
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs text-zinc-500">
-                Browse and select an individual record
-              </p>
-            </div>
-            <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[10px] text-zinc-400">
-              {filteredRows.length.toLocaleString()} results
-            </span>
-          </div>
-
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by ID, location or value..."
-              className="h-10 w-full rounded-lg border border-white/10 bg-[#101010] pl-9 pr-3 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-600 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+              placeholder="Search ID, place, value or metadata..."
+              aria-label={`Search ${dataset} observations`}
+              className="h-10 w-full rounded-lg border border-white/10 bg-[#101010] pl-9 pr-10 text-sm text-zinc-200 outline-none transition-all placeholder:text-zinc-600 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
             />
-          </div>
 
-          <div className="mb-3 flex items-center justify-between text-[10px] text-zinc-500">
-            <span>
-              Showing {displayedRows.length} of{" "}
-              {filteredRows.length.toLocaleString()} matching records
-            </span>
-            {filteredRows.length > 100 && (
-              <span className="text-primary/80">First 100 shown</span>
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-white"
+                aria-label="Clear observation search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             )}
           </div>
 
-          <div className="max-h-[660px] space-y-1.5 overflow-y-auto pr-1">
-            {displayedRows.map((row) => {
-              const isSelected = selectedRow?.key === row.key;
+          {loading ? (
+            <LoadingRows count={6} />
+          ) : (
+            <div className="max-h-[700px] space-y-1.5 overflow-y-auto pr-1">
+              {displayedRows.map((row) => {
+                const isSelected = selectedRow?.key === row.key;
 
-              return (
-                <button
-                  key={row.key}
-                  onClick={() => setSelectedId(row.key)}
-                  aria-pressed={isSelected}
-                  className={`group w-full rounded-xl border p-3 text-left transition-all duration-200 ${
-                    isSelected
-                      ? "border-primary/40 bg-primary/[0.07] shadow-[inset_2px_0_0_0_var(--primary)]"
-                      : "border-white/[0.05] bg-white/[0.015] hover:border-white/[0.12] hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-zinc-200">
-                        {row.title}
+                return (
+                  <button
+                    key={row.key}
+                    onClick={() => setSelectedId(row.key)}
+                    aria-pressed={isSelected}
+                    className={`group w-full rounded-xl border p-3 text-left transition-all duration-200 ${
+                      isSelected
+                        ? "border-primary/40 bg-primary/[0.07] shadow-[inset_2px_0_0_0_var(--primary)]"
+                        : "border-white/[0.05] bg-white/[0.015] hover:border-white/[0.12] hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-zinc-200">
+                          {row.title}
+                        </div>
+
+                        <div className="mt-1 truncate text-xs text-zinc-500">
+                          {row.subtitle}
+                        </div>
                       </div>
-                      <div className="mt-1 truncate text-xs text-zinc-500">
-                        {row.subtitle}
-                      </div>
+
+                      <Crosshair
+                        className={`mt-0.5 h-4 w-4 shrink-0 ${
+                          isSelected
+                            ? "text-primary"
+                            : "text-zinc-700 transition-colors group-hover:text-zinc-400"
+                        }`}
+                      />
                     </div>
 
-                    <ChevronRight
-                      className={`mt-0.5 h-4 w-4 shrink-0 transition-all ${
-                        isSelected
-                          ? "translate-x-0 text-primary"
-                          : "-translate-x-1 text-zinc-700 opacity-0 group-hover:translate-x-0 group-hover:opacity-100"
-                      }`}
-                    />
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-xs font-medium text-primary">
+                    <div className="mt-3 font-mono text-xs font-medium text-primary">
                       {row.value}
-                    </span>
-                    <span className="text-right text-[10px] text-zinc-500">
+                    </div>
+
+                    <div className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
                       {row.meta}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+                    </div>
+                  </button>
+                );
+              })}
 
-            {!loading && filteredRows.length === 0 && (
-              <div className="rounded-xl border border-dashed border-white/10 py-12 text-center">
-                <Search className="mx-auto h-6 w-6 text-zinc-600" />
-                <p className="mt-3 text-sm font-medium text-zinc-300">
-                  No matching observations
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Try another search term or dataset.
-                </p>
-              </div>
-            )}
+              {filteredRows.length === 0 && (
+                <EmptyState
+                  icon={<Search className="h-5 w-5" />}
+                  title="No matching observations"
+                  description="Try a different record ID, location, measurement or source."
+                />
+              )}
+            </div>
+          )}
 
-            {loading && displayedRows.length === 0 && (
-              <div className="py-12 text-center text-sm text-zinc-500">
-                Loading observation records...
-              </div>
-            )}
-          </div>
+          {!loading && filteredRows.length > 100 && (
+            <div className="mt-3 border-t border-white/[0.07] pt-3 text-center text-[10px] text-primary/80">
+              Showing the first 100 matching records
+            </div>
+          )}
         </Panel>
 
-        {/* Selected record details */}
+        {/* Selected observation details */}
         <div className="min-w-0 space-y-4">
           <Panel
             title="Observation details"
+            description="Measurement values and source metadata for inspection."
             simulated={false}
             className="min-w-0 border-white/[0.08] bg-[#080808]"
           >
             {!selectedRow ? (
-              <div className="py-16 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-500">
-                  <Database className="h-5 w-5" />
-                </div>
-                <p className="mt-4 text-sm font-medium text-zinc-300">
-                  No observation selected
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {loading
-                    ? "Loading observation records..."
-                    : "Select a record from the list to inspect its details."}
-                </p>
-              </div>
+              <EmptyState
+                icon={<Crosshair className="h-5 w-5" />}
+                title={loading ? "Loading observations" : "Select an observation"}
+                description={
+                  loading
+                    ? "The selected source records are being retrieved."
+                    : "Choose a record from the observation index to inspect its details."
+                }
+              />
             ) : (
               <>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md border border-primary/25 bg-primary/[0.08] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                      {dataset}
-                    </span>
-                    <span className="font-mono text-[11px] text-zinc-500">
+                <div className="rounded-xl border border-white/[0.07] bg-gradient-to-br from-white/[0.045] to-transparent p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <DatasetBadge dataset={dataset} />
+
+                    <span className="break-all font-mono text-[10px] text-zinc-500">
                       {selectedRow.key}
                     </span>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-zinc-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                    Selected record
-                  </span>
-                </div>
-
-                <div className="mt-5 rounded-xl border border-white/[0.07] bg-gradient-to-br from-white/[0.045] to-transparent p-4 sm:p-5">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                    Observation identifier
-                  </div>
-                  <h2 className="mt-2 break-words text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                  <h2 className="mt-4 break-words text-xl font-semibold tracking-tight text-white sm:text-2xl">
                     {selectedRow.title}
                   </h2>
-                  <p className="mt-1.5 text-sm text-zinc-400">
+
+                  <p className="mt-2 text-sm text-zinc-400">
                     {selectedRow.subtitle}
                   </p>
 
                   <div className="mt-5 border-t border-white/[0.07] pt-4">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                      Primary reading
+                      Primary measurement / diagnostic
                     </div>
-                    <div className="mt-1.5 break-words font-mono text-2xl font-semibold tracking-tight text-primary sm:text-3xl">
+
+                    <div className="mt-2 break-words font-mono text-2xl font-semibold text-primary sm:text-3xl">
                       {selectedRow.value}
                     </div>
+
                     <div className="mt-2 text-xs text-zinc-500">
                       {selectedRow.meta}
                     </div>
                   </div>
                 </div>
 
+                {/* CPCB details */}
                 {dataset === "CPCB" &&
                   "station_id" in selectedRow.record && (
                     <div className="mt-5">
@@ -649,34 +669,36 @@ function EventsPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                        <DetailItem
-                          label="Reported mean"
-                          value={`${selectedRow.record.mean.toFixed(2)} ${selectedRow.record.unit}`}
-                        />
-                        <DetailItem
-                          label="Pollutant"
-                          value={selectedRow.record.parameter_name}
-                        />
-                        <DetailItem
-                          label="Hourly observations"
-                          value={String(selectedRow.record.n)}
-                        />
-                        <DetailItem
-                          label="Station ID"
-                          value={selectedRow.record.station_id}
-                        />
-                        <DetailItem
-                          label="City / State"
-                          value={`${selectedRow.record.city_name}, ${selectedRow.record.state_name}`}
-                        />
-                        <DetailItem
-                          label="Coverage flag"
-                          value={selectedRow.record.coverage_flag.replaceAll("_", " ")}
-                        />
+                        <DetailItem label="Reported mean" mono>
+                          {selectedRow.record.mean.toFixed(2)}{" "}
+                          {selectedRow.record.unit}
+                        </DetailItem>
+
+                        <DetailItem label="Pollutant">
+                          {selectedRow.record.parameter_name}
+                        </DetailItem>
+
+                        <DetailItem label="Hourly observations" mono>
+                          {selectedRow.record.n}
+                        </DetailItem>
+
+                        <DetailItem label="Station ID" mono>
+                          {selectedRow.record.station_id}
+                        </DetailItem>
+
+                        <DetailItem label="City / State">
+                          {selectedRow.record.city_name},{" "}
+                          {selectedRow.record.state_name}
+                        </DetailItem>
+
+                        <DetailItem label="Coverage flag">
+                          {selectedRow.record.coverage_flag.replaceAll("_", " ")}
+                        </DetailItem>
                       </div>
                     </div>
                   )}
 
+                {/* Sentinel-5P details */}
                 {dataset === "Sentinel-5P" &&
                   "point_id" in selectedRow.record && (
                     <div className="mt-5">
@@ -685,59 +707,58 @@ function EventsPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                        <DetailItem
-                          label="Pollutant"
-                          value={selectedRow.record.pollutant}
-                        />
-                        <DetailItem
-                          label="Anomaly Z-score"
-                          value={
-                            selectedRow.record.anomaly_z_score === null
-                              ? "Unavailable"
-                              : selectedRow.record.anomaly_z_score.toFixed(3)
-                          }
-                          mono
-                        />
-                        <DetailItem
-                          label="Anomaly difference"
-                          value={
-                            selectedRow.record.anomaly_difference === null
-                              ? "Unavailable"
-                              : String(selectedRow.record.anomaly_difference)
-                          }
-                          mono
-                        />
-                        <DetailItem
-                          label="Direction"
-                          value={
-                            selectedRow.record.anomaly_direction ?? "Unavailable"
-                          }
-                        />
-                        <DetailItem
-                          label="Score available"
-                          value={selectedRow.record.score_available ? "Yes" : "No"}
-                        />
-                        <DetailItem
-                          label="Negative retrieval"
-                          value={selectedRow.record.negative_retrieval ? "Yes" : "No"}
-                        />
+                        <DetailItem label="Pollutant">
+                          {selectedRow.record.pollutant}
+                        </DetailItem>
 
-                        <div className="col-span-2 rounded-lg border border-white/[0.07] bg-white/[0.025] p-3 md:col-span-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                            Composite period
-                          </div>
-                          <div className="mt-1.5 text-sm text-zinc-200">
-                            {selectedRow.record.window_start} to{" "}
-                            {selectedRow.record.window_end_exclusive}
-                          </div>
-                          <div className="mt-1 text-[10px] text-zinc-500">
-                            End date is exclusive.
-                          </div>
-                        </div>
+                        <DetailItem label="Anomaly Z-score" mono>
+                          {selectedRow.record.anomaly_z_score === null
+                            ? "Unavailable"
+                            : selectedRow.record.anomaly_z_score.toFixed(3)}
+                        </DetailItem>
+
+                        <DetailItem label="Anomaly difference" mono>
+                          {selectedRow.record.anomaly_difference === null
+                            ? "Unavailable"
+                            : String(selectedRow.record.anomaly_difference)}
+                        </DetailItem>
+
+                        <DetailItem label="Direction">
+                          {selectedRow.record.anomaly_direction?.replaceAll(
+                            "_",
+                            " "
+                          ) ?? "Unavailable"}
+                        </DetailItem>
+
+                        <DetailItem label="Score available">
+                          {selectedRow.record.score_available ? "Yes" : "No"}
+                        </DetailItem>
+
+                        <DetailItem label="Negative retrieval">
+                          {selectedRow.record.negative_retrieval
+                            ? "Yes"
+                            : "No"}
+                        </DetailItem>
+
+                        <DetailItem
+                          label="Composite period"
+                          className="col-span-2 md:col-span-3"
+                        >
+                          {selectedRow.record.window_start} to{" "}
+                          {selectedRow.record.window_end_exclusive}
+                          {" "}(end date exclusive)
+                        </DetailItem>
                       </div>
+
+                      <StatusNotice className="mt-3">
+                        Sentinel-5P measures atmospheric columns, not direct
+                        ground-level exposure. Anomaly Z-scores are statistical
+                        diagnostics, not pollution-risk scores.
+                      </StatusNotice>
                     </div>
                   )}
 
+                {/* VIIRS details */}
                 {dataset === "VIIRS" &&
                   "frp" in selectedRow.record && (
                     <div className="mt-5">
@@ -746,57 +767,60 @@ function EventsPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                        <DetailItem
-                          label="Detection date"
-                          value={selectedRow.record.date}
-                        />
-                        <DetailItem
-                          label="Acquisition time"
-                          value={`${selectedRow.record.acq_time} UTC`}
-                          mono
-                        />
-                        <DetailItem
-                          label="Fire Radiative Power"
-                          value={`${selectedRow.record.frp.toFixed(2)} MW`}
-                          mono
-                        />
-                        <DetailItem
-                          label="Satellite"
-                          value={selectedRow.record.satellite}
-                        />
-                        <DetailItem
-                          label="Confidence"
-                          value={selectedRow.record.confidence}
-                        />
-                        <DetailItem
-                          label="Day / night"
-                          value={selectedRow.record.daynight}
-                        />
-                        <DetailItem
-                          label="Detection type"
-                          value={String(selectedRow.record.type)}
-                        />
+                        <DetailItem label="Detection date">
+                          {selectedRow.record.date}
+                        </DetailItem>
+
+                        <DetailItem label="Acquisition time" mono>
+                          {selectedRow.record.acq_time} UTC
+                        </DetailItem>
+
+                        <DetailItem label="Fire radiative power" mono>
+                          {selectedRow.record.frp.toFixed(2)} MW
+                        </DetailItem>
+
+                        <DetailItem label="Satellite">
+                          {selectedRow.record.satellite}
+                        </DetailItem>
+
+                        <DetailItem label="Confidence">
+                          {selectedRow.record.confidence}
+                        </DetailItem>
+
+                        <DetailItem label="Day / night">
+                          {selectedRow.record.daynight}
+                        </DetailItem>
+
+                        <DetailItem label="Detection type" mono>
+                          {selectedRow.record.type}
+                        </DetailItem>
                       </div>
                     </div>
                   )}
 
-                <div className="mt-5 rounded-xl border border-primary/15 bg-primary/[0.035] p-4">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary">
-                    <MapPinned className="h-3.5 w-3.5" />
-                    Geographic coordinates
-                  </div>
+                {/* Geographic coordinates */}
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-4">
+                  <div className="flex items-start gap-3">
+                    <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
 
-                  <div className="mt-2 font-mono text-base text-zinc-200">
-                    {"station_id" in selectedRow.record
-                      ? `${selectedRow.record.latitude}, ${selectedRow.record.longitude}`
-                      : "point_id" in selectedRow.record
-                        ? `${selectedRow.record.grid_lat}, ${selectedRow.record.grid_lon}`
-                        : `${selectedRow.record.latitude}, ${selectedRow.record.longitude}`}
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                        Geographic coordinates
+                      </div>
+
+                      <div className="mt-1.5 break-all font-mono text-sm text-zinc-200">
+                        {"station_id" in selectedRow.record
+                          ? `${selectedRow.record.latitude}, ${selectedRow.record.longitude}`
+                          : "point_id" in selectedRow.record
+                            ? `${selectedRow.record.grid_lat}, ${selectedRow.record.grid_lon}`
+                            : `${selectedRow.record.latitude}, ${selectedRow.record.longitude}`}
+                      </div>
+                    </div>
                   </div>
 
                   <Link
                     to="/map"
-                    className="group mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-cyan-300"
+                    className="group inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-cyan-300"
                   >
                     View on environmental map
                     <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -809,19 +833,19 @@ function EventsPage() {
           {/* Predictive integration status */}
           <Panel
             title="Predictive assessment"
+            description="Machine learning integration status"
             simulated={false}
             className="border-white/[0.08] bg-[#080808]"
           >
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-400">
-                <Clock3 className="h-5 w-5" />
-              </div>
+            <div className="flex items-start gap-3 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
 
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-zinc-200">
-                    Model integration pending
+                    Pending model integration
                   </span>
+
                   <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.06] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
                     Not connected
                   </span>
@@ -829,9 +853,8 @@ function EventsPage() {
 
                 <p className="mt-2 text-xs leading-relaxed text-zinc-500">
                   XGBoost risk classification, future predictions and SHAP
-                  explanations are not connected to this observation yet.
-                  This section can be populated when the predictive model
-                  integration is available.
+                  explanations are not connected to this observation. No
+                  predictive assessment is currently issued.
                 </p>
               </div>
             </div>
@@ -839,48 +862,19 @@ function EventsPage() {
         </div>
       </div>
 
-      {/* Data interpretation note */}
-      <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary/80" />
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
-            Data interpretation
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-            CPCB records represent reported station-level means. Sentinel-5P
-            records represent composite-period grid observations. VIIRS
-            records are satellite detections, not necessarily unique
-            confirmed fires. An observation alone does not establish a
-            confirmed pollution incident, its cause or its impact on
-            population.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailItem({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-white/[0.07] bg-white/[0.025] p-3">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-        {label}
-      </div>
-      <div
-        className={`mt-1.5 break-words text-sm font-medium text-zinc-200 ${
-          mono ? "font-mono" : ""
-        }`}
+      {/* Data interpretation */}
+      <StatusNotice
+        className="border-white/[0.07] bg-white/[0.02]"
+        title="Data interpretation and limitations"
       >
-        {value}
-      </div>
+        CPCB records represent reported station-level means. Sentinel-5P
+        records represent composite-period atmospheric column observations.
+        Negative retrievals are retained for inspection but should not be
+        interpreted as negative ground-level concentrations. VIIRS records
+        are satellite detections, not necessarily unique confirmed fires.
+        An observation alone does not establish a confirmed incident, its
+        cause or its impact on the population.
+      </StatusNotice>
     </div>
   );
 }

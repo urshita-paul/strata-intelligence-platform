@@ -24,15 +24,18 @@ import {
 } from "recharts";
 import type { Station } from "@/components/strata/LiveDashboardMap";
 import {
+  DatasetBadge,
+  EmptyState,
   FilterChip,
   PageHeader,
   Panel,
   StatCard,
+  StatusNotice,
   tooltipStyle,
 } from "@/components/strata/ui";
 
 const API =
-  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env["VITE_API_BASE_URL"] ||
   "http://127.0.0.1:8000";
 
 const DATES = Array.from(
@@ -71,16 +74,41 @@ export const Route = createFileRoute("/analytics")({
       {
         name: "description",
         content:
-          "Historical CPCB measurements, station coverage and VIIRS satellite fire detections.",
+          "Analyse historical CPCB measurements, Sentinel-5P composite coverage and VIIRS satellite fire detections.",
       },
       {
         property: "og:title",
         content: "Historical Analytics — STRATA",
       },
+      {
+        property: "og:description",
+        content:
+          "Historical environmental trends, observation coverage and measurement methodology.",
+      },
+      { property: "og:type", content: "website" },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
     ],
   }),
   component: AnalyticsPage,
 });
+
+const axis = {
+  stroke: "var(--muted-foreground)",
+  fontSize: 10,
+  tickLine: false,
+  axisLine: false,
+} as const;
+
+const grid = (
+  <CartesianGrid
+    stroke="var(--border)"
+    strokeDasharray="3 3"
+    vertical={false}
+  />
+);
 
 function AnalyticsPage() {
   const [range, setRange] = useState<Range>("9D");
@@ -95,7 +123,6 @@ function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Load historical observations.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -110,16 +137,14 @@ function AnalyticsPage() {
         for (const date of DATES) {
           if (controller.signal.aborted) return;
 
-          // Only two requests run concurrently for each date.
           const [cpcbResponse, fireResponse] = await Promise.all([
             fetch(
               `${API}/api/cpcb?date=${date}&pollutant=${encodeURIComponent(pollutant)}`,
               { signal: controller.signal }
             ),
-            fetch(
-              `${API}/api/fires?date=${date}`,
-              { signal: controller.signal }
-            ),
+            fetch(`${API}/api/fires?date=${date}`, {
+              signal: controller.signal,
+            }),
           ]);
 
           if (!cpcbResponse.ok) {
@@ -169,7 +194,7 @@ function AnalyticsPage() {
 
         if (controller.signal.aborted) return;
 
-        // Fetch the Sentinel-5P composite after the daily requests.
+        // Fetch the Sentinel-5P composite after daily requests.
         const satelliteResponse = await fetch(
           `${API}/api/satellite?pollutant=${satellitePollutant}&window_id=11-12`,
           { signal: controller.signal }
@@ -202,7 +227,7 @@ function AnalyticsPage() {
       }
     }
 
-    loadAnalytics();
+    void loadAnalytics();
 
     return () => controller.abort();
   }, [pollutant, satellitePollutant]);
@@ -254,20 +279,26 @@ function AnalyticsPage() {
     .filter((day) => day.fires > 0)
     .sort((a, b) => b.fires - a.fires)[0];
 
-  const axis = {
-    stroke: "#737373",
-    fontSize: 11,
-  };
+  const hasMeasurements = visibleData.some(
+    (day) => day.weightedMean !== null
+  );
 
-  const chartGrid = "#252525";
+  const scoredShare =
+    satellitePoints.length > 0
+      ? (scoredPoints / satellitePoints.length) * 100
+      : 0;
 
   return (
     <div className="space-y-5 pb-8">
       <PageHeader
+        eyebrow="Historical measurement analysis"
         title="Historical Analytics"
         subtitle="Explore historical measurements, monitoring coverage and satellite detection patterns."
         actions={
-          <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#080808] p-1">
+          <div
+            className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#080808] p-1"
+            aria-label="Date range"
+          >
             {(Object.keys(RANGES) as Range[]).map((item) => (
               <FilterChip
                 key={item}
@@ -324,6 +355,7 @@ function AnalyticsPage() {
       {/* Dataset filters */}
       <Panel
         title="Dataset configuration"
+        description="Choose the ground-station and satellite pollutants to inspect."
         simulated={false}
         className="border-white/[0.08] bg-[#080808]"
       >
@@ -357,7 +389,7 @@ function AnalyticsPage() {
               }
               className="h-10 rounded-lg border border-white/10 bg-[#101010] px-3 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/60"
             >
-              <option value="NO2">NO2</option>
+              <option value="NO2">NO₂</option>
               <option value="HCHO">HCHO</option>
             </select>
           </label>
@@ -393,10 +425,13 @@ function AnalyticsPage() {
         </div>
 
         {error && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[0.06] p-3 text-sm text-red-300">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <StatusNotice
+            tone="error"
+            title="Analytics data unavailable"
+            className="mt-4"
+          >
             {error}
-          </div>
+          </StatusNotice>
         )}
       </Panel>
 
@@ -404,47 +439,47 @@ function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
           label="CPCB Station-Days"
-          value={loading ? "—" : String(stationDays)}
+          value={stationDays.toLocaleString("en-IN")}
           delta="Station records across selected dates"
           icon={<Activity className="h-4 w-4" />}
+          accent="primary"
+          loading={loading}
         />
 
         <StatCard
           label="Hourly Observations"
-          value={loading ? "—" : observations.toLocaleString()}
+          value={observations.toLocaleString("en-IN")}
           delta="Combined station samples"
           icon={<Database className="h-4 w-4" />}
+          accent="success"
+          loading={loading}
         />
 
         <StatCard
           label="VIIRS Detections"
-          value={loading ? "—" : fireDetections.toLocaleString()}
+          value={fireDetections.toLocaleString("en-IN")}
           delta="Satellite detection records"
           icon={<Flame className="h-4 w-4" />}
+          accent="fire"
+          loading={loading}
         />
 
         <StatCard
           label="Days with CPCB Data"
-          value={
-            loading
-              ? "—"
-              : `${daysWithData}/${visibleData.length}`
-          }
+          value={`${daysWithData}/${visibleData.length || RANGES[range]}`}
           delta="Dates with station records"
           icon={<CalendarDays className="h-4 w-4" />}
+          accent="primary"
+          loading={loading}
         />
 
         <StatCard
           label="Weighted Mean"
-          value={
-            loading
-              ? "—"
-              : overallMean === null
-                ? "—"
-                : overallMean.toFixed(1)
-          }
-          delta={unit || "No measurements"}
+          value={overallMean === null ? "—" : overallMean.toFixed(1)}
+          delta={`${pollutant} · ${unit || "dataset unit"}`}
           icon={<TrendingUp className="h-4 w-4" />}
+          accent="primary"
+          loading={loading}
         />
       </div>
 
@@ -453,56 +488,48 @@ function AnalyticsPage() {
         {/* CPCB concentration trend */}
         <Panel
           title={`Daily CPCB ${pollutant} Concentration`}
+          description={`Observation-count weighted average of available station means · ${unit || "dataset unit"}`}
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
         >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-zinc-500">
-              Observation-count weighted average of available
-              station means.
-            </p>
-
-            <span className="rounded-md border border-primary/15 bg-primary/[0.06] px-2 py-1 text-[10px] text-primary">
-              {unit || "Dataset unit"}
-            </span>
-          </div>
-
           <div className="h-72 w-full">
-            {visibleData.some(
-              (day) => day.weightedMean !== null
-            ) ? (
+            {hasMeasurements ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={visibleData}
                   margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
                 >
-                  <CartesianGrid
-                    stroke={chartGrid}
-                    strokeDasharray="3 4"
-                    vertical={false}
-                  />
+                  {grid}
 
                   <XAxis
                     dataKey="label"
                     {...axis}
-                    tickLine={false}
-                    axisLine={{ stroke: chartGrid }}
                     tickMargin={10}
                   />
 
                   <YAxis
                     {...axis}
-                    tickLine={false}
-                    axisLine={false}
                     width={48}
                   />
 
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    cursor={{ stroke: "#00E5CC", strokeDasharray: "3 3" }}
+                    cursor={{
+                      stroke: "#00E5CC",
+                      strokeDasharray: "3 3",
+                    }}
+                    formatter={(value) => [
+                      `${Number(value).toFixed(2)} ${unit}`,
+                      "Weighted mean",
+                    ]}
+                    labelStyle={{
+                      color: "var(--foreground)",
+                      marginBottom: 6,
+                    }}
                   />
 
                   <Line
+                    type="monotone"
                     dataKey="weightedMean"
                     name="Weighted mean"
                     stroke="var(--chart-1)"
@@ -524,9 +551,14 @@ function AnalyticsPage() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <ChartEmptyState
-                loading={loading}
-                message="No CPCB measurements available for this range."
+              <EmptyState
+                title="No concentration trend"
+                description={
+                  loading
+                    ? "Loading daily station measurements…"
+                    : "No station measurements are available for this selection."
+                }
+                className="h-72"
               />
             )}
           </div>
@@ -535,18 +567,20 @@ function AnalyticsPage() {
             <span className="h-2 w-2 rounded-full bg-primary" />
             Daily observation-count weighted mean
           </div>
+
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            Gaps represent unavailable measurements. Missing records
+            do not establish an absence of pollution.
+          </p>
         </Panel>
 
         {/* VIIRS detections */}
         <Panel
           title="Daily VIIRS Fire Detections"
+          description="Satellite detection records per day · not unique confirmed fires"
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
         >
-          <p className="mb-4 text-xs text-zinc-500">
-            Number of satellite detection records returned for each day.
-          </p>
-
           <div className="h-72 w-full">
             {visibleData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -554,51 +588,55 @@ function AnalyticsPage() {
                   data={visibleData}
                   margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
                 >
-                  <CartesianGrid
-                    stroke={chartGrid}
-                    strokeDasharray="3 4"
-                    vertical={false}
-                  />
+                  {grid}
 
                   <XAxis
                     dataKey="label"
                     {...axis}
-                    tickLine={false}
-                    axisLine={{ stroke: chartGrid }}
                     tickMargin={10}
                   />
 
                   <YAxis
                     {...axis}
                     allowDecimals={false}
-                    tickLine={false}
-                    axisLine={false}
                     width={40}
                   />
 
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    cursor={{ fill: "rgba(255,255,255,0.035)" }}
+                    cursor={{
+                      fill: "var(--accent)",
+                      opacity: 0.3,
+                    }}
+                    formatter={(value) => [
+                      Number(value).toLocaleString("en-IN"),
+                      "VIIRS detections",
+                    ]}
                   />
 
                   <Bar
                     dataKey="fires"
                     name="VIIRS detections"
-                    fill="var(--chart-3)"
+                    fill="var(--chart-2)"
                     radius={[5, 5, 0, 0]}
                     maxBarSize={48}
                   />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <ChartEmptyState
-                loading={loading}
-                message="No VIIRS records available."
+              <EmptyState
+                title="No VIIRS records"
+                description={
+                  loading
+                    ? "Loading daily fire detections…"
+                    : "No detection records are available for this range."
+                }
+                className="h-72"
               />
             )}
           </div>
 
-          {peakFireDay && (
+          {peakFireDay ? (
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
               <Flame className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
 
@@ -610,19 +648,22 @@ function AnalyticsPage() {
                 on {peakFireDay.label}.
               </p>
             </div>
+          ) : (
+            <p className="mt-3 border-t border-white/[0.07] pt-3 text-[11px] text-muted-foreground">
+              {loading
+                ? "Loading daily fire detections…"
+                : "No fire detections were returned for this range."}
+            </p>
           )}
         </Panel>
 
         {/* CPCB station coverage */}
         <Panel
           title="CPCB Station Reporting Coverage"
+          description={`Monitoring stations returning ${pollutant} data each day`}
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
         >
-          <p className="mb-4 text-xs text-zinc-500">
-            Number of monitoring stations returning {pollutant} data each day.
-          </p>
-
           <div className="h-64 w-full">
             {visibleData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -630,32 +671,21 @@ function AnalyticsPage() {
                   data={visibleData}
                   margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
                 >
-                  <CartesianGrid
-                    stroke={chartGrid}
-                    strokeDasharray="3 4"
-                    vertical={false}
-                  />
+                  {grid}
 
                   <XAxis
                     dataKey="label"
                     {...axis}
-                    tickLine={false}
-                    axisLine={{ stroke: chartGrid }}
                     tickMargin={10}
                   />
 
                   <YAxis
                     {...axis}
                     allowDecimals={false}
-                    tickLine={false}
-                    axisLine={false}
                     width={40}
                   />
 
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={{ fill: "rgba(255,255,255,0.035)" }}
-                  />
+                  <Tooltip contentStyle={tooltipStyle} />
 
                   <Bar
                     dataKey="stations"
@@ -667,9 +697,14 @@ function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <ChartEmptyState
-                loading={loading}
-                message="No station coverage records available."
+              <EmptyState
+                title="No station coverage"
+                description={
+                  loading
+                    ? "Loading reporting station data…"
+                    : "No station coverage records are available."
+                }
+                className="h-64"
               />
             )}
           </div>
@@ -683,6 +718,8 @@ function AnalyticsPage() {
         {/* Sentinel-5P composite coverage */}
         <Panel
           title="Sentinel-5P Composite Coverage"
+          description={`${satellitePollutant} grid observations · 12–18 November 2024, end exclusive`}
+          action={<DatasetBadge dataset="Sentinel-5P" />}
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
         >
@@ -697,7 +734,7 @@ function AnalyticsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
+            <div className="rounded-xl border border-satellite/20 bg-satellite/[0.05] p-4">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
                 <Satellite className="h-4 w-4" />
               </div>
@@ -705,7 +742,7 @@ function AnalyticsPage() {
               <div className="mt-4 font-mono text-3xl font-semibold tracking-tight text-white">
                 {loading
                   ? "..."
-                  : satellitePoints.length.toLocaleString()}
+                  : satellitePoints.length.toLocaleString("en-IN")}
               </div>
 
               <div className="mt-1 text-xs text-zinc-500">
@@ -719,7 +756,9 @@ function AnalyticsPage() {
               </div>
 
               <div className="mt-4 font-mono text-3xl font-semibold tracking-tight text-white">
-                {loading ? "..." : scoredPoints.toLocaleString()}
+                {loading
+                  ? "..."
+                  : scoredPoints.toLocaleString("en-IN")}
               </div>
 
               <div className="mt-1 text-xs text-zinc-500">
@@ -730,18 +769,42 @@ function AnalyticsPage() {
 
           <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              Composite period
+              Scored observation share
             </div>
 
-            <div className="mt-2 text-sm font-semibold text-zinc-200">
-              12–18 November 2024
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-zinc-500">
+                Points with available scores
+              </span>
+
+              <span className="font-mono text-zinc-200">
+                {loading ? "—" : `${scoredShare.toFixed(1)}%`}
+              </span>
             </div>
 
-            <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-              The end date is exclusive. These observations represent
-              a composite-period satellite dataset, not daily
-              measurements.
-            </p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07]">
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{ width: `${scoredShare}%` }}
+              />
+            </div>
+
+            <div className="mt-4 border-t border-white/[0.07] pt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                Composite period
+              </div>
+
+              <div className="mt-2 text-sm font-semibold text-zinc-200">
+                12–18 November 2024
+              </div>
+
+              <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                The end date is exclusive. These observations
+                represent a composite-period atmospheric column
+                dataset, not daily measurements or direct
+                ground-level exposure.
+              </p>
+            </div>
           </div>
         </Panel>
       </div>
@@ -749,12 +812,14 @@ function AnalyticsPage() {
       {/* Daily data coverage table */}
       <Panel
         title="Daily Data Coverage"
+        description="Daily CPCB and VIIRS records for the selected range."
         simulated={false}
         className="border-white/[0.08] bg-[#080808]"
+        contentClassName="p-0 sm:p-0"
       >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
           <p className="text-xs text-zinc-500">
-            Daily CPCB and VIIRS records for the selected range.
+            Returned records for each date in the selected range.
           </p>
 
           <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-zinc-400">
@@ -763,132 +828,76 @@ function AnalyticsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] border-collapse text-left text-sm">
+          <table className="data-table min-w-[680px]">
             <thead>
-              <tr className="border-b border-white/[0.09] text-[10px] uppercase tracking-wider text-zinc-500">
-                <th className="pb-3 pr-4 font-semibold">
-                  Date
-                </th>
-
-                <th className="pb-3 pr-4 font-semibold">
-                  CPCB stations
-                </th>
-
-                <th className="pb-3 pr-4 font-semibold">
-                  Hourly observations
-                </th>
-
-                <th className="pb-3 pr-4 font-semibold">
-                  VIIRS detections
-                </th>
-
-                <th className="pb-3 font-semibold">
-                  Coverage status
-                </th>
+              <tr>
+                <th>Date</th>
+                <th>CPCB stations</th>
+                <th>Hourly observations</th>
+                <th>VIIRS detections</th>
+                <th>Coverage status</th>
               </tr>
             </thead>
 
             <tbody>
               {[...visibleData].reverse().map((day) => (
-                <tr
-                  key={day.date}
-                  className="border-b border-white/[0.05] transition-colors hover:bg-white/[0.02]"
-                >
-                  <td className="py-3 pr-4 font-mono text-xs text-zinc-300">
+                <tr key={day.date}>
+                  <td className="font-mono text-xs">
                     {day.date}
                   </td>
 
-                  <td className="py-3 pr-4 font-mono text-xs text-zinc-300">
-                    {day.stations.toLocaleString()}
+                  <td className="font-mono text-xs">
+                    {day.stations.toLocaleString("en-IN")}
                   </td>
 
-                  <td className="py-3 pr-4 font-mono text-xs text-zinc-300">
-                    {day.observations.toLocaleString()}
+                  <td className="font-mono text-xs">
+                    {day.observations.toLocaleString("en-IN")}
                   </td>
 
-                  <td className="py-3 pr-4 font-mono text-xs text-zinc-300">
-                    {day.fires.toLocaleString()}
+                  <td className="font-mono text-xs">
+                    {day.fires.toLocaleString("en-IN")}
                   </td>
 
-                  <td className="py-3 text-xs">
-                    {day.stations > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 text-primary">
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                        CPCB records returned
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-zinc-500">
-                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-600" />
-                        No records returned
-                      </span>
-                    )}
+                  <td>
+                    <span
+                      className={
+                        day.stations > 0
+                          ? "text-success"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {day.stations > 0
+                        ? "CPCB records returned"
+                        : "No records returned"}
+                    </span>
                   </td>
                 </tr>
               ))}
-
-              {visibleData.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="py-12 text-center text-sm text-zinc-500"
-                  >
-                    {loading
-                      ? "Loading historical records..."
-                      : "No historical records available."}
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {!loading && visibleData.length === 0 && (
+          <EmptyState
+            title="No daily coverage records"
+            description="Try another pollutant or reload the data service."
+          />
+        )}
       </Panel>
 
       {/* Data interpretation */}
-      <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
-          <Info className="h-4 w-4" />
-        </div>
-
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
-            Data interpretation & limitations
-          </div>
-
-          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-            Source: historical CPCB ground-station archive,
-            Sentinel-5P satellite composite and NASA FIRMS VIIRS
-            detections. The weighted mean is calculated from reported
-            station means and their hourly observation counts.
-            VIIRS detections are not necessarily unique confirmed
-            fires. Missing records do not establish an absence of
-            pollution or fire activity.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChartEmptyState({
-  loading,
-  message,
-}: {
-  loading: boolean;
-  message: string;
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.08] bg-white/[0.015] text-center">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-500">
-        <BarChart3 className="h-5 w-5" />
-      </div>
-
-      <p className="mt-3 text-sm font-medium text-zinc-300">
-        {loading ? "Loading chart data..." : "No data available"}
-      </p>
-
-      <p className="mt-1 max-w-xs px-4 text-xs text-zinc-500">
-        {message}
-      </p>
+      <StatusNotice
+        className="mt-4"
+        title="Data interpretation and limitations"
+      >
+        The weighted mean uses reported station means multiplied by
+        hourly observation counts. Sentinel-5P measurements are
+        composite-period atmospheric columns, not direct ground-level
+        exposure measurements. VIIRS detections are not necessarily
+        unique confirmed fires. Missing records do not establish an
+        absence of pollution or fire activity. These historical
+        summaries do not establish causation, exposure or future risk.
+      </StatusNotice>
     </div>
   );
 }

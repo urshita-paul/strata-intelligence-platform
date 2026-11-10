@@ -81,8 +81,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "STRATA — Pollution Event Intelligence" },
-      { name: "description", content: "AI-powered pollution event intelligence and early warning platform." },
+      { title: "STRATA NEXUS — Environmental Intelligence" },
+      { name: "description", content: "Historical environmental observation intelligence. Understand the signals shaping our environment." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },

@@ -4,11 +4,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
   Bell,
+  BellRing,
+  Building2,
   Check,
+  CloudOff,
   Database,
   Gauge,
   Info,
   Mail,
+  MapPin,
   MapPinned,
   Satellite,
   Settings2,
@@ -18,11 +22,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
-import { PageHeader, Panel } from "@/components/strata/ui";
+import {
+  PageHeader,
+  Panel,
+  StatusNotice,
+} from "@/components/strata/ui";
 import { useAppState } from "@/components/strata/AppState";
 
 const API =
-  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env["VITE_API_BASE_URL"] ||
   "http://127.0.0.1:8000";
 
 type SourceStatus =
@@ -59,38 +67,51 @@ type FireResponse = {
   detections?: unknown[];
 };
 
-const initialSources: SourceStatuses = {
-  cpcb: {
-    status: "checking",
-    detail: "Checking CPCB API...",
-  },
-  satellite: {
-    status: "checking",
-    detail: "Checking Sentinel-5P API...",
-  },
-  viirs: {
-    status: "checking",
-    detail: "Checking VIIRS API...",
-  },
-};
-
 type PreferenceKey =
   | "notifyCritical"
   | "notifyHigh"
   | "dailyDigest";
 
+const initialSources: SourceStatuses = {
+  cpcb: {
+    status: "checking",
+    detail: "Checking the CPCB endpoint...",
+  },
+  satellite: {
+    status: "checking",
+    detail: "Checking the Sentinel-5P endpoint...",
+  },
+  viirs: {
+    status: "checking",
+    detail: "Checking the VIIRS endpoint...",
+  },
+};
+
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — STRATA" },
+      { title: "Workspace Settings — STRATA" },
       {
         name: "description",
         content:
-          "Manage workspace preferences and view environmental data-source connectivity.",
+          "Manage session workspace preferences and inspect environmental data-source connectivity and integration status.",
       },
       {
         property: "og:title",
-        content: "Settings — STRATA",
+        content: "Workspace Settings — STRATA",
+      },
+      {
+        property: "og:description",
+        content:
+          "Workspace preferences, data-source status and pending integrations for STRATA.",
+      },
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
       },
     ],
   }),
@@ -104,13 +125,19 @@ async function fetchJson<T>(
   const response = await fetch(url, { signal });
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw new Error(
+      `Request failed with status ${response.status}`
+    );
   }
 
   return (await response.json()) as T;
 }
 
-function SourceBadge({ status }: { status: SourceStatus }) {
+function SourceBadge({
+  status,
+}: {
+  status: SourceStatus;
+}) {
   const styles: Record<SourceStatus, string> = {
     checking:
       "border-zinc-500/25 bg-zinc-500/[0.06] text-zinc-400",
@@ -144,11 +171,85 @@ function SourceBadge({ status }: { status: SourceStatus }) {
     <span
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${styles[status]}`}
     >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${indicators[status]}`}
-      />
+      {status === "connected" ? (
+        <Check className="h-3 w-3" />
+      ) : (
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${indicators[status]}`}
+        />
+      )}
       {labels[status]}
     </span>
+  );
+}
+
+function SourceRow({
+  icon,
+  name,
+  source,
+  note,
+}: {
+  icon: ReactNode;
+  name: string;
+  source: SourceInfo;
+  note?: string;
+}) {
+  return (
+    <li className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.035] text-primary">
+        {icon}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-medium text-zinc-200">
+            {name}
+          </div>
+          <SourceBadge status={source.status} />
+        </div>
+
+        <div className="mt-2 break-words text-[11px] leading-relaxed text-zinc-500">
+          {source.detail}
+        </div>
+
+        {note && (
+          <div className="mt-1 text-[10px] text-zinc-600">
+            {note}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function PreferenceRow({
+  label,
+  desc,
+  checked,
+  onCheckedChange,
+}: {
+  label: string;
+  desc: string;
+  checked: boolean;
+  onCheckedChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-4">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-zinc-200">
+          {label}
+        </div>
+        <div className="mt-1 text-xs leading-relaxed text-zinc-500">
+          {desc}
+        </div>
+      </div>
+
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-label={label}
+      />
+    </div>
   );
 }
 
@@ -163,7 +264,6 @@ function SettingsPage() {
   const input =
     "mt-2 h-11 w-full rounded-lg border border-white/10 bg-[#101010] px-3 text-sm text-zinc-200 outline-none transition-colors placeholder:text-zinc-600 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
 
-  // Check real environmental data-source connectivity.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -173,12 +273,10 @@ function SettingsPage() {
           `${API}/api/cpcb?date=2024-11-17&pollutant=PM2.5`,
           controller.signal
         ),
-
         fetchJson<SatelliteResponse>(
           `${API}/api/satellite?pollutant=NO2&window_id=11-12`,
           controller.signal
         ),
-
         fetchJson<FireResponse>(
           `${API}/api/fires?date=2024-11-17`,
           controller.signal
@@ -187,9 +285,7 @@ function SettingsPage() {
 
       if (controller.signal.aborted) return;
 
-      const cpcb = results[0];
-      const satellite = results[1];
-      const viirs = results[2];
+      const [cpcb, satellite, viirs] = results;
 
       setSources({
         cpcb:
@@ -204,7 +300,8 @@ function SettingsPage() {
               }
             : {
                 status: "unavailable",
-                detail: "CPCB endpoint could not be reached.",
+                detail:
+                  "The CPCB endpoint could not be reached.",
               },
 
         satellite:
@@ -219,7 +316,8 @@ function SettingsPage() {
               }
             : {
                 status: "unavailable",
-                detail: "Sentinel-5P endpoint could not be reached.",
+                detail:
+                  "The Sentinel-5P endpoint could not be reached.",
               },
 
         viirs:
@@ -234,30 +332,56 @@ function SettingsPage() {
               }
             : {
                 status: "unavailable",
-                detail: "VIIRS endpoint could not be reached.",
+                detail:
+                  "The VIIRS endpoint could not be reached.",
               },
       });
     }
 
-    checkSources();
+    void checkSources();
 
     return () => controller.abort();
   }, []);
 
   function saveSettings() {
     updateSettings(draft);
-    toast.success("Preferences saved for this session only");
+    toast.success(
+      "Preferences saved for this session only"
+    );
   }
 
   const connectedCount = Object.values(sources).filter(
     (source) => source.status === "connected"
   ).length;
 
+  const preferenceOptions: {
+    key: PreferenceKey;
+    label: string;
+    desc: string;
+  }[] = [
+    {
+      key: "notifyCritical",
+      label: "Critical alerts",
+      desc: "Preference for future critical-event notifications",
+    },
+    {
+      key: "notifyHigh",
+      label: "High severity alerts",
+      desc: "Preference for future high-severity notifications",
+    },
+    {
+      key: "dailyDigest",
+      label: "Daily digest",
+      desc: "Preference for a future daily summary",
+    },
+  ];
+
   return (
     <div className="space-y-5 pb-8">
       <PageHeader
+        eyebrow="Workspace administration"
         title="Settings"
-        subtitle="Manage workspace preferences, notification options and environmental data-source connectivity."
+        subtitle="Manage workspace preferences and inspect the live status of environmental data sources and pending integrations."
         actions={
           <button
             onClick={saveSettings}
@@ -269,7 +393,7 @@ function SettingsPage() {
         }
       />
 
-      {/* Settings introduction */}
+      {/* Workspace introduction */}
       <section className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#080B0A] p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-teal-400/[0.08] blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-cyan-500/[0.05] blur-3xl" />
@@ -303,50 +427,44 @@ function SettingsPage() {
             </div>
 
             <div className="mt-1 text-[10px] text-zinc-500">
-              API endpoint checks
+              Live API endpoint checks
             </div>
           </div>
         </div>
       </section>
 
-      {/* Preference storage notice */}
-      <div className="flex items-start gap-3 rounded-xl border border-amber-400/15 bg-amber-400/[0.035] p-4">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/[0.08] text-amber-300">
-          <Info className="h-4 w-4" />
-        </div>
+      <StatusNotice
+        tone="warning"
+        title="Session-only preferences"
+        className="mb-1"
+      >
+        These settings are stored in application memory for
+        the active session. They are not saved to a database
+        or restored automatically after a page reload.
+      </StatusNotice>
 
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-300">
-            Session-based preferences
-          </div>
-
-          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-            These preferences are currently stored in application
-            memory for the active session. They are not yet saved
-            to a database or restored automatically after a page
-            reload.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
         {/* Workspace profile */}
         <Panel
           title="Workspace profile"
+          description="Identity and regional preferences for this analyst workspace"
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
+          action={<Building2 className="h-4 w-4 text-primary" />}
         >
-          <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.07] text-primary">
+          <div className="mb-5 flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.07] text-primary">
               <UserRound className="h-5 w-5" />
             </div>
 
-            <div>
-              <div className="text-sm font-semibold text-zinc-200">
-                Organisation details
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-zinc-200">
+                {draft.org || "Unnamed workspace"}
               </div>
-              <div className="mt-0.5 text-xs text-zinc-500">
-                Workspace identity and regional preference
+
+              <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-zinc-500">
+                <Mail className="h-3 w-3 shrink-0" />
+                {draft.email || "No contact email"}
               </div>
             </div>
           </div>
@@ -428,20 +546,22 @@ function SettingsPage() {
             </select>
           </div>
 
-          <div className="mt-5 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
             <p className="text-xs leading-relaxed text-zinc-500">
-              These are workspace profile preferences. They do not
-              currently change the geographic filters in the
-              individual dashboard modules.
+              These profile preferences do not currently change
+              geographic filters in individual dashboard modules.
             </p>
           </div>
         </Panel>
 
-        {/* Alert thresholds */}
+        {/* Measurement preferences */}
         <Panel
-          title="Alert threshold preferences"
+          title="Measurement preferences"
+          description="Threshold and display preferences for future workspace capabilities"
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
+          action={<Gauge className="h-4 w-4 text-primary" />}
         >
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.07] text-primary">
@@ -516,26 +636,23 @@ function SettingsPage() {
             <option value="metric">
               Metric (µg/m³, mg/L)
             </option>
-            <option value="imperial">
-              Imperial
-            </option>
+            <option value="imperial">Imperial</option>
           </select>
 
-          <div className="mt-5 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-            <p className="text-xs leading-relaxed text-zinc-500">
-              Threshold and unit selections are preferences only.
-              An automated AQI alert engine is not currently
-              connected, and changing the unit preference does not
-              yet convert measurements displayed by the data modules.
-            </p>
-          </div>
+          <StatusNotice tone="warning" className="mt-5">
+            Threshold and unit selections are preferences only.
+            No automated AQI alert engine is connected, and
+            changing units does not yet convert module measurements.
+          </StatusNotice>
         </Panel>
 
         {/* Notification preferences */}
         <Panel
           title="Notification preferences"
+          description="Future delivery choices, not active notification services"
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
+          action={<BellRing className="h-4 w-4 text-primary" />}
         >
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.07] text-primary">
@@ -553,141 +670,179 @@ function SettingsPage() {
           </div>
 
           <div className="divide-y divide-white/[0.07]">
-            <PreferenceRow
-              label="Critical alerts"
-              desc="Preference for future critical-event notifications"
-              checked={draft.notifyCritical}
-              onCheckedChange={(value) =>
-                setDraft((current) => ({
-                  ...current,
-                  notifyCritical: value,
-                }))
-              }
-            />
-
-            <PreferenceRow
-              label="High severity alerts"
-              desc="Preference for future high-severity notifications"
-              checked={draft.notifyHigh}
-              onCheckedChange={(value) =>
-                setDraft((current) => ({
-                  ...current,
-                  notifyHigh: value,
-                }))
-              }
-            />
-
-            <PreferenceRow
-              label="Daily digest"
-              desc="Preference for a future daily summary"
-              checked={draft.dailyDigest}
-              onCheckedChange={(value) =>
-                setDraft((current) => ({
-                  ...current,
-                  dailyDigest: value,
-                }))
-              }
-            />
+            {preferenceOptions.map((option) => (
+              <PreferenceRow
+                key={option.key}
+                label={option.label}
+                desc={option.desc}
+                checked={draft[option.key]}
+                onCheckedChange={(value) =>
+                  setDraft((current) => ({
+                    ...current,
+                    [option.key]: value,
+                  }))
+                }
+              />
+            ))}
           </div>
 
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
-            <Bell className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
-
-            <p className="text-xs leading-relaxed text-zinc-500">
-              These switches currently store preference values
-              only. Email delivery, push notifications and
-              automated environmental alerts are not configured.
-            </p>
-          </div>
+          <StatusNotice
+            tone="warning"
+            className="mt-4"
+            title="Delivery not configured"
+          >
+            These switches currently store preference values only.
+            Email delivery, push notifications and automated
+            environmental alerts are not operational.
+          </StatusNotice>
         </Panel>
 
-        {/* Environmental data sources */}
+        {/* Integration overview */}
         <Panel
-          title="Environmental data sources"
+          title="Integration overview"
+          description="What is connected, unavailable or still pending"
           simulated={false}
           className="min-w-0 border-white/[0.08] bg-[#080808]"
+          action={<Database className="h-4 w-4 text-primary" />}
         >
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.07] text-primary">
-              <Database className="h-5 w-5" />
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.045] p-3 text-center">
+              <div className="font-mono text-2xl font-semibold text-emerald-400">
+                {connectedCount}
+              </div>
+              <div className="mt-1 text-[10px] text-zinc-500">
+                Connected
+              </div>
             </div>
 
-            <div>
-              <div className="text-sm font-semibold text-zinc-200">
-                Connected services
+            <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-center">
+              <div className="font-mono text-2xl font-semibold text-zinc-300">
+                2
               </div>
-              <div className="mt-0.5 text-xs text-zinc-500">
-                Current endpoint response status
+              <div className="mt-1 text-[10px] text-zinc-500">
+                Not integrated
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.045] p-3 text-center">
+              <div className="font-mono text-2xl font-semibold text-amber-300">
+                1
+              </div>
+              <div className="mt-1 text-[10px] text-zinc-500">
+                Pending model
               </div>
             </div>
           </div>
 
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              Available integrated sources
-            </span>
+          <p className="mt-4 text-xs leading-relaxed text-zinc-500">
+            Connection checks run when this page loads. A successful
+            response confirms endpoint availability, not the
+            accuracy or completeness of its underlying data.
+          </p>
 
-            <span className="font-mono text-sm font-semibold text-zinc-200">
-              {connectedCount}/3
-            </span>
-          </div>
-
-          <ul className="divide-y divide-white/[0.07]">
-            <SourceRow
-              icon={<Activity className="h-4 w-4" />}
-              name="CPCB CAAQMS"
-              detail={sources.cpcb.detail}
-              status={sources.cpcb.status}
-            />
-
-            <SourceRow
-              icon={<Satellite className="h-4 w-4" />}
-              name="Sentinel-5P TROPOMI"
-              detail={sources.satellite.detail}
-              status={sources.satellite.status}
-            />
-
-            <SourceRow
-              icon={<Activity className="h-4 w-4" />}
-              name="VIIRS Fire Observations"
-              detail={sources.viirs.detail}
-              status={sources.viirs.status}
-            />
-
-            <SourceRow
-              icon={<Database className="h-4 w-4" />}
-              name="River water quality sensors"
-              detail="No connected data endpoint currently available."
-              status="not-integrated"
-            />
-
-            <SourceRow
-              icon={<Activity className="h-4 w-4" />}
-              name="IMD meteorological feed"
-              detail="No connected data endpoint currently available."
-              status="not-integrated"
-            />
-
-            <SourceRow
-              icon={<ShieldAlert className="h-4 w-4" />}
-              name="Predictive ML model"
-              detail="Awaiting model integration and validation."
-              status="pending"
-            />
-          </ul>
-
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
-            <InfoIcon />
-
-            <p className="text-xs leading-relaxed text-zinc-500">
-              Connection status is checked against the configured
-              API endpoints when this page loads. A successful
-              response confirms endpoint availability, not the
-              accuracy or completeness of its underlying data.
+          <div className="mt-4 rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] p-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
+              <ShieldAlert className="h-4 w-4 text-zinc-500" />
+              Integration security
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+              No API credentials are displayed or stored in this
+              settings interface.
             </p>
           </div>
         </Panel>
       </div>
+
+      {/* Environmental data sources */}
+      <Panel
+        title="Environmental data sources"
+        description="Live endpoint checks and explicit integration states"
+        simulated={false}
+        className="border-white/[0.08] bg-[#080808]"
+        action={<Database className="h-4 w-4 text-primary" />}
+      >
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-3">
+          <div>
+            <div className="text-xs font-semibold text-zinc-300">
+              Available integrated sources
+            </div>
+            <div className="mt-1 text-[10px] text-zinc-500">
+              Based on current API endpoint responses
+            </div>
+          </div>
+
+          <div className="font-mono text-lg font-semibold text-primary">
+            {connectedCount}/3
+          </div>
+        </div>
+
+        <ul className="grid gap-2 lg:grid-cols-2">
+          <SourceRow
+            icon={<Activity className="h-4 w-4" />}
+            name="CPCB CAAQMS"
+            source={sources.cpcb}
+            note="Ground-station reported observations"
+          />
+
+          <SourceRow
+            icon={<Satellite className="h-4 w-4" />}
+            name="Sentinel-5P TROPOMI"
+            source={sources.satellite}
+            note="Atmospheric column grid observations"
+          />
+
+          <SourceRow
+            icon={<Database className="h-4 w-4" />}
+            name="VIIRS Fire Observations"
+            source={sources.viirs}
+            note="NASA FIRMS satellite detection records"
+          />
+
+          <SourceRow
+            icon={<CloudOff className="h-4 w-4" />}
+            name="River water quality sensors"
+            source={{
+              status: "not-integrated",
+              detail:
+                "No connected data endpoint currently available.",
+            }}
+          />
+
+          <SourceRow
+            icon={<CloudOff className="h-4 w-4" />}
+            name="IMD meteorological feed"
+            source={{
+              status: "not-integrated",
+              detail:
+                "No connected data endpoint currently available.",
+            }}
+          />
+
+          <SourceRow
+            icon={<ShieldAlert className="h-4 w-4" />}
+            name="Predictive ML model"
+            source={{
+              status: "pending",
+              detail:
+                "Awaiting model integration and validation.",
+            }}
+            note="No predictions are currently issued"
+          />
+        </ul>
+
+        <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/[0.08] text-amber-300">
+            <Info className="h-4 w-4" />
+          </div>
+
+          <p className="text-xs leading-relaxed text-zinc-500">
+            Connection status is checked against the configured
+            API endpoints when this page loads. A successful
+            response confirms endpoint availability, not the
+            accuracy or completeness of its underlying data.
+          </p>
+        </div>
+      </Panel>
 
       {/* Save reminder */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
@@ -714,78 +869,6 @@ function SettingsPage() {
           Save preferences
         </button>
       </div>
-    </div>
-  );
-}
-
-function PreferenceRow({
-  label,
-  desc,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  desc: string;
-  checked: boolean;
-  onCheckedChange: (value: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-4">
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-zinc-200">
-          {label}
-        </div>
-        <div className="mt-1 text-xs leading-relaxed text-zinc-500">
-          {desc}
-        </div>
-      </div>
-
-      <Switch
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-      />
-    </div>
-  );
-}
-
-function SourceRow({
-  icon,
-  name,
-  detail,
-  status,
-}: {
-  icon: ReactNode;
-  name: string;
-  detail: string;
-  status: SourceStatus;
-}) {
-  return (
-    <li className="flex items-start justify-between gap-3 py-3">
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.025] text-zinc-400">
-          {icon}
-        </div>
-
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-zinc-200">
-            {name}
-          </div>
-
-          <div className="mt-1 break-words text-[11px] leading-relaxed text-zinc-500">
-            {detail}
-          </div>
-        </div>
-      </div>
-
-      <SourceBadge status={status} />
-    </li>
-  );
-}
-
-function InfoIcon() {
-  return (
-    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/[0.08] text-amber-300">
-      <Info className="h-4 w-4" />
     </div>
   );
 }

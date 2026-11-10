@@ -35,14 +35,26 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
   --color-surface: var(--surface);
   --color-panel: var(--panel);
   --color-panel-elevated: var(--panel-elevated);
+  --color-elevated: var(--elevated);
+
+  --color-success: var(--success);
+  --color-satellite: var(--satellite);
+  --color-fire: var(--fire);
+  --color-caution: var(--caution);
+  --color-boundary: var(--boundary);
+
   --color-critical: var(--critical);
   --color-high: var(--high);
   --color-moderate: var(--moderate);
   --color-low: var(--low);
   --color-sim: var(--sim);
+
+  --color-mint: var(--mint);
+  --color-lime: var(--lime);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -62,7 +74,6 @@
 
 :root {
   color-scheme: dark;
-
   --radius: 0.75rem;
 
   /* Pure black surfaces */
@@ -70,6 +81,7 @@
   --surface: oklch(0.055 0 0);
   --panel: oklch(0.075 0 0);
   --panel-elevated: oklch(0.105 0 0);
+  --elevated: oklch(0.105 0 0);
 
   /* Typography */
   --foreground: oklch(0.96 0 0);
@@ -98,6 +110,7 @@
   --ring: oklch(0.83 0.16 180);
 
   --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
 
   /* Environmental severity */
   --critical: oklch(0.65 0.22 25);
@@ -105,6 +118,16 @@
   --moderate: oklch(0.84 0.14 95);
   --low: oklch(0.76 0.16 155);
   --sim: oklch(0.82 0.13 80);
+
+  /* Remote component compatibility */
+  --success: oklch(0.76 0.16 155);
+  --satellite: oklch(0.72 0.105 235);
+  --fire: oklch(0.76 0.16 55);
+  --caution: oklch(0.84 0.14 95);
+  --boundary: oklch(0.62 0.055 205);
+
+  --mint: oklch(0.83 0.16 180);
+  --lime: oklch(0.86 0.16 125);
 
   /* Charts */
   --chart-1: oklch(0.83 0.16 180);
@@ -122,6 +145,10 @@
   --sidebar-accent-foreground: oklch(0.96 0 0);
   --sidebar-border: oklch(0.19 0 0);
   --sidebar-ring: oklch(0.83 0.16 180);
+
+  /* Shadows */
+  --shadow-panel: 0 16px 45px -28px #000000;
+  --shadow-float: 0 22px 55px -20px #000000;
 }
 
 @layer base {
@@ -162,10 +189,12 @@
     outline-offset: 3px;
   }
 
+  button,
+  a,
   input,
   select,
-  textarea,
-  button {
+  textarea {
+    -webkit-tap-highlight-color: transparent;
     font: inherit;
   }
 }
@@ -236,9 +265,189 @@
     transform: scale(1);
     opacity: 0.7;
   }
+
   100% {
     transform: scale(3);
     opacity: 0;
+  }
+}
+
+/* Remote shared UI compatibility */
+
+.panel-frame {
+  border: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--elevated) 42%, transparent),
+      transparent 58%
+    ),
+    var(--panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.control-label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--muted-foreground);
+  font-size: 0.69rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.control-input {
+  height: 2.5rem;
+  min-width: 0;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+  padding: 0 0.75rem;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.control-input:hover {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+}
+
+.control-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 10%, transparent);
+  outline: none;
+}
+
+.control-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.primary-button,
+.secondary-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+  cursor: pointer;
+}
+
+.primary-button {
+  min-height: 2.5rem;
+  background: var(--primary);
+  padding: 0 1rem;
+  color: var(--primary-foreground);
+}
+
+.primary-button:hover {
+  background: color-mix(in oklab, var(--primary) 88%, var(--foreground));
+}
+
+.primary-button:active,
+.secondary-button:active {
+  transform: translateY(1px);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.secondary-button {
+  min-height: 2.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0 0.85rem;
+  color: var(--foreground);
+}
+
+.secondary-button:hover {
+  border-color: color-mix(in oklab, var(--primary) 55%, var(--border));
+  background: var(--accent);
+}
+
+.icon-button {
+  height: 2.5rem;
+  width: 2.5rem;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 85%, transparent);
+  color: var(--muted-foreground);
+}
+
+.icon-button:hover {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.data-table th {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.85rem;
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  padding: 0.8rem 0.85rem;
+}
+
+.data-table tbody tr {
+  transition: background 150ms ease;
+}
+
+.data-table tbody tr:hover {
+  background: color-mix(in oklab, var(--primary) 4%, transparent);
+}
+
+.page-enter {
+  animation: page-enter 260ms cubic-bezier(.2, .7, .2, 1) both;
+}
+
+.dropdown-enter {
+  animation: dropdown-enter 160ms ease-out both;
+  transform-origin: top;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -252,6 +461,13 @@
 
 .leaflet-tile-pane {
   filter: brightness(0.72) saturate(0.65);
+}
+
+.leaflet-control-zoom {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-panel) !important;
 }
 
 .leaflet-control-zoom a {
@@ -278,7 +494,7 @@
 .leaflet-popup-tip {
   background: var(--popover);
   color: var(--foreground);
-  box-shadow: 0 12px 30px #000000;
+  box-shadow: var(--shadow-float);
 }
 
 .leaflet-popup-content-wrapper {
@@ -294,6 +510,12 @@
 .leaflet-popup-close-button {
   color: var(--muted-foreground);
 }
+
+.leaflet-interactive:focus {
+  outline: none;
+}
+
+/* Original STRATA map popup */
 
 .strata-map-popup__heading {
   padding-right: 12px;
@@ -330,6 +552,318 @@
   opacity: 0.9;
 }
 
-.leaflet-interactive:focus {
-  outline: none;
+/* Remote map popup compatibility */
+
+.map-popup {
+  padding: 15px;
+}
+
+.map-popup__source {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.map-popup__heading {
+  margin-top: 5px;
+  padding-right: 12px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.map-popup__reading {
+  margin-top: 10px;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.map-popup__details {
+  margin-top: 10px;
+  display: grid;
+  gap: 5px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.map-popup__action {
+  margin-top: 12px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  padding: 7px 10px;
+  color: var(--primary-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.state-label {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--foreground) !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-shadow: 0 1px 4px var(--background);
+}
+
+/* Nexus branding and navigation */
+
+.nexus-shell {
+  background: var(--background);
+}
+
+.nexus-sidebar {
+  background: linear-gradient(180deg, var(--sidebar), var(--background));
+}
+
+.nexus-navigation .active {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--primary) 14%, transparent),
+    transparent
+  );
+  color: var(--foreground);
+}
+
+.nexus-navigation .active svg {
+  color: var(--mint);
+}
+
+.nexus-navigation .active .nav-indicator {
+  box-shadow: 0 0 12px color-mix(in oklab, var(--mint) 25%, transparent);
+}
+
+.nexus-mark {
+  flex-shrink: 0;
+}
+
+.nexus-mark-connecting {
+  animation: nexus-connect 2.5s ease-in-out infinite;
+}
+
+@keyframes nexus-connect {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(2px);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.nexus-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mint);
+}
+
+.nexus-eyebrow::before {
+  content: "";
+  width: 1.4rem;
+  height: 1px;
+  background: var(--primary);
+}
+
+.nexus-heading {
+  font-size: 2.75rem;
+  line-height: 1.13;
+  font-weight: 500;
+  max-width: 800px;
+}
+
+.nexus-filterbar {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.nexus-filterbar .control-input {
+  background: transparent;
+  border-color: transparent;
+  border-bottom-color: var(--border);
+  padding-left: 0;
+  border-radius: 0;
+}
+
+.nexus-filterbar .control-input:focus {
+  box-shadow: none;
+  border-bottom-color: var(--mint);
+}
+
+.nexus-filterbar .control-label {
+  font-size: 0.58rem;
+}
+
+.nexus-map-stage {
+  position: relative;
+  height: 560px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.nexus-map-stage .leaflet-control-zoom {
+  margin-top: 66px;
+}
+
+.nexus-map-stage::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  box-shadow: inset 0 0 65px color-mix(in oklab, var(--background) 30%, transparent);
+}
+
+.nexus-map-stage .leaflet-container {
+  min-height: 100%;
+}
+
+.nexus-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+}
+
+.nexus-section-header h2 {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.nexus-measurement {
+  display: block;
+  padding: 1.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.nexus-measurement:last-child {
+  border-bottom: 0;
+}
+
+.nexus-measurement:hover .nexus-measurement-value {
+  color: var(--mint);
+}
+
+.nexus-measurement-value {
+  min-height: 2.8rem;
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: color 180ms;
+}
+
+.nexus-skeleton {
+  background: linear-gradient(90deg, var(--surface), var(--accent), var(--surface));
+  background-size: 200% 100%;
+  animation: nexus-shimmer 2s ease infinite;
+}
+
+@keyframes nexus-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.nexus-bottom-band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--border);
+}
+
+.nexus-bottom-band > * {
+  padding: 1.25rem 0;
+}
+
+.nexus-bottom-band > * + * {
+  border-left: 1px solid var(--border);
+  padding-left: 1.5rem;
+}
+
+.nexus-ledger .data-table th {
+  padding-left: 0;
+}
+
+.nexus-ledger .data-table td {
+  padding-left: 0;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.nexus-methodology {
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  line-height: 1.7;
+}
+
+.nexus-methodology summary {
+  cursor: pointer;
+  padding: 1rem 0;
+  color: var(--foreground);
+}
+
+/* Responsive layout */
+
+@media (max-width: 1100px) {
+  .nexus-heading {
+    font-size: 2.25rem;
+  }
+
+  .nexus-map-stage {
+    height: 500px;
+  }
+}
+
+@media (max-width: 640px) {
+  .nexus-heading {
+    font-size: 1.9rem;
+  }
+
+  .nexus-map-stage {
+    height: 430px;
+  }
+
+  .nexus-bottom-band {
+    grid-template-columns: 1fr;
+  }
+
+  .nexus-bottom-band > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+  }
+
+  .nexus-measurement {
+    padding: 1rem 0;
+  }
+}
+
+/* Accessibility */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

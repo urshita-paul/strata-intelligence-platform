@@ -22,8 +22,19 @@ export const Route = createFileRoute("/map")({
       {
         name: "description",
         content:
-          "Historical environmental intelligence map with CPCB, Sentinel-5P and VIIRS datasets.",
+          "Explore CPCB stations, Sentinel-5P grid observations and VIIRS detections in an interactive historical intelligence map.",
       },
+      {
+        property: "og:title",
+        content: "Environmental Intelligence Map — STRATA",
+      },
+      {
+        property: "og:description",
+        content:
+          "A multi-source geospatial workspace for historical environmental observations.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: MapPage,
@@ -109,7 +120,11 @@ function SourceIndicator({
       </div>
 
       <div className="mt-4 flex items-center gap-1.5 border-t border-white/[0.06] pt-3">
-        <span className={`h-1.5 w-1.5 rounded-full ${style.label.replace("text-", "bg-").replace("/70", "")}`} />
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${style.label
+            .replace("text-", "bg-")
+            .replace("/70", "")}`}
+        />
         <span className="text-[9px] text-zinc-600">
           Integrated dataset
         </span>
@@ -220,9 +235,7 @@ function MapPage() {
               <div className="mt-5 border-t border-white/[0.07] pt-4">
                 <div className="flex items-center justify-between text-[10px] text-zinc-500">
                   <span>Integrated datasets</span>
-                  <span className="font-mono text-zinc-300">
-                    03
-                  </span>
+                  <span className="font-mono text-zinc-300">03</span>
                 </div>
 
                 <div className="mt-3 flex gap-1.5">

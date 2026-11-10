@@ -1,4 +1,3 @@
-
 import {
   lazy,
   Suspense,
@@ -16,6 +15,7 @@ import {
   Activity,
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
   CalendarDays,
   Clock3,
   Database,
@@ -24,18 +24,37 @@ import {
   Map,
   MapPinned,
   Radio,
+  RefreshCw,
   Satellite,
   SlidersHorizontal,
   Wind,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart as RechartsBarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { Station } from "@/components/strata/LiveDashboardMap";
+import {
+  DatasetBadge,
+  EmptyState,
+  StatusNotice,
+  tooltipStyle,
+} from "@/components/strata/ui";
+import { Button } from "@/components/ui/button";
+import type { Dataset } from "@/components/strata/ui";
+import { observationDisplay } from "@/lib/observation-display";
 
 const LiveDashboardMap = lazy(
   () => import("@/components/strata/LiveDashboardMap")
 );
 
 const API =
-  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env["VITE_API_BASE_URL"] ||
   "http://127.0.0.1:8000";
 
 const REGIONS = [
@@ -104,13 +123,23 @@ function MetricCard({
   detail,
   icon,
   index,
+  loading,
+  error,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: ReactNode;
   index: string;
+  loading: boolean;
+  error: string;
 }) {
+  const display = loading
+    ? "—"
+    : error
+      ? "Unavailable"
+      : value;
+
   return (
     <div className="group relative isolate overflow-hidden rounded-2xl border border-white/[0.075] bg-[#070707] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:bg-[#0A0C0B] sm:p-5">
       <div className="pointer-events-none absolute -right-8 -top-12 h-32 w-32 rounded-full bg-primary/[0.035] blur-3xl transition-all duration-300 group-hover:bg-primary/[0.10]" />
@@ -126,8 +155,8 @@ function MetricCard({
       </div>
 
       <div className="relative mt-5">
-        <div className="font-mono text-3xl font-semibold tracking-tight text-white sm:text-[34px]">
-          {value}
+        <div className="break-words font-mono text-2xl font-semibold tracking-tight text-white sm:text-[30px]">
+          {display}
         </div>
 
         <div className="mt-2 text-sm font-medium text-zinc-300">
@@ -186,6 +215,8 @@ function SourceCard({
   description,
   note,
   accent = "teal",
+  loading,
+  error,
 }: {
   icon: ReactNode;
   source: string;
@@ -194,6 +225,8 @@ function SourceCard({
   description: string;
   note: string;
   accent?: "teal" | "cyan" | "orange";
+  loading: boolean;
+  error: string;
 }) {
   const accents = {
     teal: {
@@ -235,7 +268,7 @@ function SourceCard({
         </div>
 
         <div className="mt-2 font-mono text-3xl font-semibold tracking-tight text-white">
-          {value}
+          {loading ? "—" : error ? "—" : value}
         </div>
 
         <div className="mt-1 text-[11px] text-zinc-500">
@@ -256,12 +289,29 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       {
-        title: "STRATA Command Centre — Environmental Intelligence",
+        title: "STRATA NEXUS Overview — Environmental Intelligence",
       },
       {
         name: "description",
         content:
-          "Historical environmental observations from CPCB, Sentinel-5P and VIIRS.",
+          "A unified command centre for historical CPCB ground measurements, Sentinel-5P atmospheric observations and VIIRS fire detections.",
+      },
+      {
+        property: "og:title",
+        content: "STRATA NEXUS Overview — Environmental Intelligence",
+      },
+      {
+        property: "og:description",
+        content:
+          "Explore historical environmental measurements, satellite observations and fire detections in one intelligence workspace.",
+      },
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
       },
     ],
   }),
@@ -282,8 +332,8 @@ function CommandCentre() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
 
-  // Load all three environmental datasets.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -308,7 +358,7 @@ function CommandCentre() {
         ]);
 
         if (responses.some((response) => !response.ok)) {
-          throw new Error("An API request failed.");
+          throw new Error("An environmental data request failed.");
         }
 
         const cpcbData = (await responses[0].json()) as {
@@ -332,7 +382,7 @@ function CommandCentre() {
         }
 
         setError(
-          "Unable to load environmental data. Please check the API connection."
+          "Unable to load environmental data. Check the data service connection and try another selection."
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -341,12 +391,11 @@ function CommandCentre() {
       }
     }
 
-    loadData();
+    void loadData();
 
     return () => controller.abort();
-  }, [date, pollutant, satellitePollutant]);
+  }, [date, pollutant, satellitePollutant, retry]);
 
-  // Apply geographic region filter.
   const filteredStations = useMemo(() => {
     return stations.filter((station) => {
       return (
@@ -356,7 +405,6 @@ function CommandCentre() {
     });
   }, [stations, region]);
 
-  // Summary calculations.
   const statesCount = new Set(
     stations.map((station) => station.state_name)
   ).size;
@@ -373,6 +421,11 @@ function CommandCentre() {
   const topStations = [...filteredStations]
     .sort((a, b) => b.mean - a.mean)
     .slice(0, 8);
+
+  const chartStations = topStations.slice(0, 6);
+  const unit = filteredStations[0]?.unit ?? "dataset unit";
+
+  const unavailable = loading || Boolean(error);
 
   return (
     <div className="space-y-6 pb-10">
@@ -393,7 +446,7 @@ function CommandCentre() {
 
               <div>
                 <div className="text-[10px] font-bold tracking-[0.22em] text-white">
-                  STRATA
+                  STRATA NEXUS
                 </div>
                 <div className="text-[8px] uppercase tracking-[0.16em] text-zinc-600">
                   Environmental intelligence
@@ -457,10 +510,19 @@ function CommandCentre() {
 
                 <Link
                   to="/events"
+                  search={{ dataset: "CPCB", q: "", id: "" }}
                   className="inline-flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.025] px-4 py-3 text-xs font-medium text-zinc-300 transition-all hover:border-white/20 hover:bg-white/[0.05]"
                 >
                   Explore observations
                   <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+
+                <Link
+                  to="/reports"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.025] px-4 py-3 text-xs font-medium text-zinc-300 transition-all hover:border-white/20 hover:bg-white/[0.05]"
+                >
+                  Build report
+                  <BarChart3 className="h-3.5 w-3.5" />
                 </Link>
               </div>
             </div>
@@ -613,7 +675,9 @@ function CommandCentre() {
 
             <select
               value={satellitePollutant}
-              onChange={(event) => setSatellitePollutant(event.target.value)}
+              onChange={(event) =>
+                setSatellitePollutant(event.target.value)
+              }
               className="h-11 w-full rounded-xl border border-white/[0.09] bg-[#0B0B0B] px-3 text-sm text-zinc-200 outline-none transition focus:border-primary/50"
             >
               <option value="NO2">NO2</option>
@@ -665,9 +729,24 @@ function CommandCentre() {
         </div>
 
         {error && (
-          <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/[0.05] p-3 text-xs text-red-300">
-            {error}
-          </div>
+          <StatusNotice
+            tone="error"
+            title="Environmental data unavailable"
+            className="mt-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>{error}</span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRetry((value) => value + 1)}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Retry connection
+              </Button>
+            </div>
+          </StatusNotice>
         )}
       </section>
 
@@ -700,6 +779,8 @@ function CommandCentre() {
             value={stations.length.toLocaleString()}
             detail="Stations returned by API"
             icon={<Activity className="h-4 w-4" />}
+            loading={loading}
+            error={error}
           />
 
           <MetricCard
@@ -708,6 +789,8 @@ function CommandCentre() {
             value={satellitePoints.length.toLocaleString()}
             detail={`${satellitePollutant} observations`}
             icon={<Satellite className="h-4 w-4" />}
+            loading={loading}
+            error={error}
           />
 
           <MetricCard
@@ -716,6 +799,8 @@ function CommandCentre() {
             value={fires.length.toLocaleString()}
             detail="Satellite fire-detection records"
             icon={<Flame className="h-4 w-4" />}
+            loading={loading}
+            error={error}
           />
 
           <MetricCard
@@ -724,6 +809,8 @@ function CommandCentre() {
             value={statesCount.toLocaleString()}
             detail="States with CPCB stations"
             icon={<MapPinned className="h-4 w-4" />}
+            loading={loading}
+            error={error}
           />
 
           <MetricCard
@@ -732,13 +819,14 @@ function CommandCentre() {
             value={hourlyObservations.toLocaleString()}
             detail="Combined station observations"
             icon={<Database className="h-4 w-4" />}
+            loading={loading}
+            error={error}
           />
         </div>
       </section>
 
       {/* MAP AND DATASET OVERVIEW */}
       <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.75fr)_minmax(300px,0.8fr)]">
-        {/* MAP */}
         <div className="min-w-0 overflow-hidden rounded-2xl border border-white/[0.075] bg-[#070707] p-4 sm:p-5">
           <SectionHeading
             eyebrow="Geospatial intelligence"
@@ -773,7 +861,11 @@ function CommandCentre() {
 
             <div className="text-right">
               <div className="font-mono text-sm font-semibold text-white">
-                {filteredStations.length.toLocaleString()}
+                {observationDisplay(
+                  filteredStations.length,
+                  loading,
+                  error
+                ) ?? "—"}
               </div>
               <div className="text-[9px] text-zinc-600">
                 of {stations.length.toLocaleString()} stations
@@ -781,12 +873,40 @@ function CommandCentre() {
             </div>
           </div>
 
-          <div className="h-[450px] overflow-hidden rounded-xl border border-white/[0.08] bg-black sm:h-[510px]">
-            <ClientOnly fallback={<MapLoading />}>
-              <Suspense fallback={<MapLoading />}>
-                <LiveDashboardMap stations={filteredStations} />
-              </Suspense>
-            </ClientOnly>
+          <div className="relative h-[450px] overflow-hidden rounded-xl border border-white/[0.08] bg-black sm:h-[510px]">
+            {unavailable ? (
+              loading ? (
+                <MapLoading />
+              ) : (
+                <EmptyState
+                  icon={<MapPinned className="h-5 w-5" />}
+                  title="Station geography unavailable"
+                  description="Retry the environmental connection to load station observations."
+                  className="h-full"
+                />
+              )
+            ) : (
+              <ClientOnly fallback={<MapLoading />}>
+                <Suspense fallback={<MapLoading />}>
+                  <LiveDashboardMap stations={filteredStations} />
+                </Suspense>
+              </ClientOnly>
+            )}
+
+            <div className="pointer-events-none absolute left-4 right-4 top-4 z-[450] flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-2 border border-white/[0.10] bg-[#050505]/90 px-2.5 py-1.5 font-mono text-[9px] text-primary">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                CPCB / {pollutant}
+              </span>
+
+              <span className="bg-[#050505]/90 px-2.5 py-1.5 font-mono text-[9px] text-zinc-400">
+                {loading
+                  ? "CONNECTING"
+                  : error
+                    ? "UNAVAILABLE"
+                    : `${filteredStations.length} STATIONS / ${region.toUpperCase()}`}
+              </span>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -825,6 +945,8 @@ function CommandCentre() {
               note={`${lowCoverageCount} stations with low-coverage flags`}
               icon={<Activity className="h-4 w-4" />}
               accent="teal"
+              loading={loading}
+              error={error}
             />
 
             <SourceCard
@@ -835,6 +957,8 @@ function CommandCentre() {
               note="Composite: 12–18 November 2024 · End date exclusive"
               icon={<Satellite className="h-4 w-4" />}
               accent="cyan"
+              loading={loading}
+              error={error}
             />
 
             <SourceCard
@@ -845,6 +969,8 @@ function CommandCentre() {
               note="Satellite detections, not unique confirmed fires"
               icon={<Flame className="h-4 w-4" />}
               accent="orange"
+              loading={loading}
+              error={error}
             />
           </div>
 
@@ -879,152 +1005,279 @@ function CommandCentre() {
         </div>
       </section>
 
-      {/* STATION TABLE */}
-      <section className="overflow-hidden rounded-2xl border border-white/[0.075] bg-[#070707] p-4 sm:p-6">
-        <SectionHeading
-          eyebrow="Ground observation analysis"
-          title="Highest station mean readings"
-          description={`Ranked by reported ${pollutant} station mean for ${date}. These are measurements, not risk scores.`}
-          action={
-            <div className="flex items-center gap-2 rounded-lg border border-white/[0.07] bg-[#050505] px-3 py-2 text-[9px] text-zinc-500">
-              <Radio className="h-3.5 w-3.5 text-primary" />
-              {filteredStations.length} stations in selected region
+      {/* COMPARISON AND STATION RECORDS */}
+      <section className="grid min-w-0 gap-5 border-t border-white/[0.07] pt-7 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        {/* STATION COMPARISON CHART */}
+        <div className="min-w-0 rounded-2xl border border-white/[0.075] bg-[#070707] p-4 sm:p-5">
+          <SectionHeading
+            eyebrow="02 / Measurement comparison"
+            title="Reported station means"
+            description="Six highest returned means. This is not a risk ranking."
+            action={<DatasetBadge dataset={"CPCB" as Dataset} />}
+          />
+
+          {loading ? (
+            <div
+              className="flex h-[285px] items-end gap-5 px-8 pb-8"
+              aria-label="Loading station comparison"
+            >
+              {[45, 70, 55, 80, 60, 40].map((height, index) => (
+                <div
+                  key={index}
+                  className="animate-pulse rounded-t bg-white/[0.07]"
+                  style={{ height: `${height}%`, flex: 1 }}
+                />
+              ))}
             </div>
-          }
-        />
+          ) : error || chartStations.length === 0 ? (
+            <EmptyState
+              icon={<BarChart3 className="h-5 w-5" />}
+              title={
+                error
+                  ? "Measurements unavailable"
+                  : "No station measurements"
+              }
+              description={
+                error
+                  ? "Retry the connection to view the comparison."
+                  : "No CPCB records match this selection."
+              }
+            />
+          ) : (
+            <div className="h-[285px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart
+                  data={chartStations}
+                  margin={{
+                    top: 8,
+                    right: 8,
+                    left: -16,
+                    bottom: 34,
+                  }}
+                >
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeDasharray="2 6"
+                    vertical={false}
+                  />
 
-        {topStations.length === 0 ? (
-          <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.025] text-zinc-500">
-              <Database className="h-5 w-5" />
+                  <XAxis
+                    dataKey="city_name"
+                    stroke="#71717a"
+                    axisLine={false}
+                    tickLine={false}
+                    fontSize={10}
+                    interval={0}
+                    angle={-28}
+                    textAnchor="end"
+                    height={64}
+                  />
+
+                  <YAxis
+                    stroke="#71717a"
+                    axisLine={false}
+                    tickLine={false}
+                    fontSize={10}
+                  />
+
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    cursor={{
+                      fill: "rgba(255,255,255,0.04)",
+                    }}
+                    formatter={(value) => [
+                      `${Number(value).toFixed(2)} ${unit}`,
+                      "Reported mean",
+                    ]}
+                  />
+
+                  <Bar
+                    dataKey="mean"
+                    name="Reported mean"
+                    fill="var(--chart-1)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={32}
+                  />
+                </RechartsBarChart>
+              </ResponsiveContainer>
             </div>
+          )}
 
-            <div>
-              <p className="text-sm font-medium text-zinc-300">
-                {loading
-                  ? "Loading station readings..."
-                  : "No station observations available"}
-              </p>
-
-              <p className="mt-1 text-xs text-zinc-600">
-                {loading
-                  ? "Retrieving CPCB records."
-                  : "Try another date or geographic region."}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.08] text-[9px] uppercase tracking-[0.16em] text-zinc-600">
-                  <th className="pb-4 pr-4 font-semibold">
-                    Station
-                  </th>
-
-                  <th className="pb-4 pr-4 font-semibold">
-                    City / State
-                  </th>
-
-                  <th className="pb-4 pr-4 font-semibold">
-                    Mean reading
-                  </th>
-
-                  <th className="pb-4 pr-4 font-semibold">
-                    Observations
-                  </th>
-
-                  <th className="pb-4 font-semibold">
-                    Coverage
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {topStations.map((station, index) => (
-                  <tr
-                    key={station.station_id}
-                    className="border-b border-white/[0.045] transition-colors hover:bg-white/[0.02]"
-                  >
-                    <td className="py-4 pr-4">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.025] font-mono text-[9px] text-zinc-500">
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-
-                        <span className="font-medium text-zinc-200">
-                          {station.station_name}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="py-4 pr-4 text-xs text-zinc-500">
-                      {station.city_name}, {station.state_name}
-                    </td>
-
-                    <td className="py-4 pr-4">
-                      <span className="font-mono text-sm font-semibold text-white">
-                        {station.mean.toFixed(2)}
-                      </span>
-
-                      <span className="ml-1.5 text-[10px] text-zinc-600">
-                        {station.unit}
-                      </span>
-                    </td>
-
-                    <td className="py-4 pr-4 font-mono text-xs text-zinc-400">
-                      {station.n.toLocaleString()}
-                    </td>
-
-                    <td className="py-4 text-xs text-zinc-500">
-                      {(station.coverage_flag ?? "not reported").replaceAll(
-                        "_",
-                        " "
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-          <p className="text-[10px] text-zinc-600">
-            Highest reported means among the returned station records.
+          <p className="mt-2 text-[10px] text-zinc-600">
+            {unavailable
+              ? "Measurement unit available once observations load."
+              : `Unit: ${unit}. Station-reported means for ${date}.`}
           </p>
 
           <Link
-            to="/events"
-            className="group inline-flex items-center gap-1.5 text-[10px] font-semibold text-primary transition-colors hover:text-cyan-300"
+            to="/analytics"
+            className="mt-4 inline-flex items-center gap-2 text-[11px] font-semibold text-primary transition-colors hover:text-cyan-300"
           >
-            Explore all observations
-            <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            Explore historical trends
+            <ArrowUpRight className="h-3 w-3" />
           </Link>
+        </div>
+
+        {/* STATION LEDGER */}
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-white/[0.075] bg-[#070707] p-4 sm:p-5">
+          <SectionHeading
+            eyebrow="03 / Observation ledger"
+            title="Station records & coverage"
+            description="Explore the highest reported station readings."
+            action={
+              <Link
+                to="/events"
+                search={{ dataset: "CPCB", q: "", id: "" }}
+                aria-label="Open observation explorer"
+                title="Open observation explorer"
+                className="rounded-lg border border-primary/20 bg-primary/[0.06] p-2 text-primary transition hover:bg-primary/[0.12]"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            }
+          />
+
+          {loading ? (
+            <div
+              className="space-y-5 py-3"
+              aria-label="Loading station records"
+            >
+              {[0, 1, 2, 3, 4].map((row) => (
+                <div
+                  key={row}
+                  className="h-8 animate-pulse rounded bg-white/[0.06]"
+                />
+              ))}
+            </div>
+          ) : error || topStations.length === 0 ? (
+            <EmptyState
+              title={
+                error
+                  ? "Records unavailable"
+                  : "No observations returned"
+              }
+              description={
+                error
+                  ? "Retry the connection to load station records."
+                  : "Try another region, pollutant or date."
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.08] text-[9px] uppercase tracking-[0.16em] text-zinc-600">
+                    <th className="pb-4 pr-4 font-semibold">
+                      Station / location
+                    </th>
+                    <th className="pb-4 pr-4 font-semibold">
+                      Mean reading
+                    </th>
+                    <th className="pb-4 font-semibold">
+                      Samples
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {topStations.slice(0, 6).map((station) => (
+                    <tr
+                      key={station.station_id}
+                      className="border-b border-white/[0.045] transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="py-4 pr-4">
+                        <Link
+                          to="/events"
+                          search={{
+                            dataset: "CPCB",
+                            q: "",
+                            id: station.station_id,
+                          }}
+                          className="block max-w-64 truncate text-xs font-medium text-zinc-200 transition hover:text-primary"
+                          title={station.station_name}
+                        >
+                          {station.station_name}
+                        </Link>
+
+                        <div className="mt-1 text-[10px] text-zinc-600">
+                          {station.city_name}, {station.state_name}
+                        </div>
+                      </td>
+
+                      <td className="whitespace-nowrap py-4 pr-4 font-mono text-xs text-primary">
+                        {station.mean.toFixed(2)}
+                        <span className="ml-1 text-[9px] text-zinc-600">
+                          {station.unit}
+                        </span>
+                      </td>
+
+                      <td className="py-4 font-mono text-xs text-zinc-400">
+                        {station.n.toLocaleString()}
+
+                        <div className="mt-1 max-w-28 font-sans text-[9px] text-zinc-600">
+                          {(station.coverage_flag ?? "not reported").replaceAll(
+                            "_",
+                            " "
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <Link
+              to="/events"
+              search={{ dataset: "CPCB", q: "", id: "" }}
+              className="inline-flex items-center gap-2 text-[10px] font-semibold text-primary transition hover:text-cyan-300"
+            >
+              Open complete observation ledger
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* DATA TRANSPARENCY */}
-      <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-[#070707] p-4">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-          <Database className="h-4 w-4" />
-        </div>
+      <details className="group overflow-hidden rounded-2xl border border-white/[0.075] bg-[#070707]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 transition hover:bg-white/[0.02] sm:p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+              <Database className="h-4 w-4" />
+            </div>
 
-        <div>
-          <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
-            Data interpretation
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-primary/80">
+                Data transparency
+              </div>
+              <div className="mt-1 text-sm font-semibold text-zinc-200">
+                Measurement methodology & source limitations
+              </div>
+            </div>
           </div>
 
-          <p className="mt-1.5 text-[11px] leading-6 text-zinc-500">
-            STRATA historical data view. CPCB values are station-level
-            reported means. Sentinel-5P measurements use composite
-            windows and are not direct ground-level exposure
-            measurements. VIIRS records represent satellite fire
-            detections and should not be interpreted as unique
-            confirmed fires.
+          <span className="text-xs text-zinc-500 transition-transform group-open:rotate-180">
+            ↓
+          </span>
+        </summary>
+
+        <div className="border-t border-white/[0.06] px-4 pb-5 pt-4 sm:px-5">
+          <p className="text-[11px] leading-6 text-zinc-500">
+            CPCB values are station-level reported means.
+            Sentinel-5P uses composite-period atmospheric column
+            measurements (12–18 November 2024, end date exclusive),
+            not direct ground-level exposure. VIIRS records are
+            satellite fire detections and should not be interpreted
+            as unique confirmed fires. Counts describe returned
+            records, not environmental severity, causation or
+            population exposure. Predictive model integration
+            remains pending.
           </p>
         </div>
-      </div>
+      </details>
     </div>
   );
 }
