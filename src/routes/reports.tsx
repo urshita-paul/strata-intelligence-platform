@@ -755,6 +755,127 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
+
+// Historical ML and saved NUGEN assessments are independent of the live report generator.
+type HistoricalStation = {
+  station_id: string;
+  station_name: string;
+  "ground_PM2.5_mean": number;
+  predicted_PM25?: number;
+  absolute_error: number;
+};
+type NugenReport = {
+  executive_summary: string;
+  hotspot_analysis: {
+    top_3_observed_stations: HistoricalStation[];
+    top_3_prediction_errors: HistoricalStation[];
+  };
+  model_reliability_analysis: { R2: number; RMSE: number; MAE: number; bias: number };
+  environmental_interpretation: string;
+  monitoring_recommendations: string[];
+  uncertainty_and_limitations: string[];
+};
+type PredictionRecord = {
+  case_definition?: string;
+  feature_set: string;
+  station_id: string;
+  station_name: string;
+  "ground_PM2.5_mean": number;
+  predicted_PM25: number;
+  absolute_error?: number;
+  valid_observation?: boolean;
+};
+type PredictionsExport = {
+  case_study: { records: PredictionRecord[] };
+};
+
+function HistoricalIntelligencePanels() {
+  const [nugen, setNugen] = useState<NugenReport | null>(null);
+  const [predictions, setPredictions] = useState<PredictionsExport | null>(null);
+  const [nugenError, setNugenError] = useState("");
+  const [modelError, setModelError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async <T,>(path: string): Promise<T> => {
+      const response = await fetch(path, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<T>;
+    };
+    void load<NugenReport>("/ml-data/strata_nugen_report.json")
+      .then((data) => { if (!controller.signal.aborted) setNugen(data); })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setNugenError(String(error)); });
+    void load<PredictionsExport>("/ml-data/strata_predictions.json")
+      .then((data) => { if (!controller.signal.aborted) setPredictions(data); })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setModelError(String(error)); });
+    return () => controller.abort();
+  }, []);
+
+  const records = (predictions?.case_study?.records ?? []).filter(
+    (item) => item.feature_set === "forecast_prior_only" &&
+      item.case_definition === "exact_week_2024-11-08_to_2024-11-14" &&
+      item.valid_observation !== false &&
+      Number.isFinite(item["ground_PM2.5_mean"]) && Number.isFinite(item.predicted_PM25)
+  );
+  const metrics = nugen?.model_reliability_analysis;
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-teal-400/25 bg-[#080B0A] p-5 sm:p-6">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-400">XGBoost · validated historical evaluation</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">PM2.5 prediction vs observation</h2>
+        <p className="mt-1 text-xs text-zinc-400">8–14 November 2024 · Prior-only forecast model · Not a live forecast</p>
+        {modelError && <p className="mt-3 text-sm text-red-400">Could not load ML predictions: {modelError}</p>}
+        {!predictions && !modelError && <p className="mt-3 text-sm text-zinc-400">Loading model predictions…</p>}
+        {predictions && records.length === 0 && <p className="mt-3 text-sm text-amber-300">Prediction file loaded; no matching exact-week prior-only records found.</p>}
+        {records.length > 0 && (
+          <>
+            <p className="mt-3 text-sm text-zinc-300">{records.length} station records loaded from the actual historical XGBoost output.</p>
+            <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white/5 text-zinc-400"><tr><th className="p-3">Station</th><th className="p-3">Observed (µg/m³)</th><th className="p-3">Predicted (µg/m³)</th><th className="p-3">Absolute error</th></tr></thead>
+                <tbody>{records.slice(0, 12).map((item) => (
+                  <tr key={item.station_id} className="border-t border-white/10 text-zinc-300">
+                    <td className="p-3">{item.station_name}</td>
+                    <td className="p-3">{item["ground_PM2.5_mean"].toFixed(2)}</td>
+                    <td className="p-3 text-teal-300">{item.predicted_PM25.toFixed(2)}</td>
+                    <td className="p-3">{Math.abs(item["ground_PM2.5_mean"] - item.predicted_PM25).toFixed(2)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-500">Showing the first 12 records. Metrics below are for the full 91-station historical evaluation, not just the displayed rows.</p>
+          </>
+        )}
+      </section>
+      <section className="rounded-2xl border border-teal-400/25 bg-[#080B0A] p-5 sm:p-6">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-400">NUGEN-powered intelligence · saved analysis</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Historical pollution event assessment</h2>
+        <p className="mt-1 text-xs text-zinc-400">AI-assisted interpretation of supplied evidence · Not live NUGEN inference</p>
+        {nugenError && <p className="mt-3 text-sm text-red-400">Could not load NUGEN report: {nugenError}</p>}
+        {!nugen && !nugenError && <p className="mt-3 text-sm text-zinc-400">Loading NUGEN assessment…</p>}
+        {nugen && (
+          <div className="mt-4 space-y-5">
+            <p className="text-sm leading-7 text-zinc-300">{nugen.executive_summary}</p>
+            {metrics && <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {([ ["MAE", metrics.MAE, "µg/m³"], ["RMSE", metrics.RMSE, "µg/m³"], ["R²", metrics.R2, "variance explained"], ["Bias", metrics.bias, "µg/m³"] ] as const).map(([label, value, unit]) => (
+                <div key={label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="text-xs text-zinc-400">{label}</p><p className="mt-1 text-xl font-semibold text-teal-300">{value.toFixed(label === "R²" ? 3 : 2)}</p><p className="text-[10px] text-zinc-500">{unit}</p></div>
+              ))}
+            </div>}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-white/10 p-4"><h3 className="mb-3 text-sm font-semibold text-white">Highest observed PM2.5 · supplied evidence</h3>{nugen.hotspot_analysis.top_3_observed_stations.map((station) => <div key={station.station_id} className="mb-2 flex justify-between gap-3 text-xs text-zinc-300"><span>{station.station_name}</span><span className="shrink-0 text-teal-300">{station["ground_PM2.5_mean"].toFixed(2)} µg/m³</span></div>)}</div>
+              <div className="rounded-xl border border-white/10 p-4"><h3 className="mb-3 text-sm font-semibold text-white">Largest errors · supplied evidence</h3>{nugen.hotspot_analysis.top_3_prediction_errors.map((station) => <div key={station.station_id} className="mb-2 flex justify-between gap-3 text-xs text-zinc-300"><span>{station.station_name}</span><span className="shrink-0 text-amber-300">{station.absolute_error.toFixed(2)} µg/m³</span></div>)}</div>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div><h3 className="mb-2 text-sm font-semibold text-white">Environmental interpretation</h3><p className="text-xs leading-6 text-zinc-400">{nugen.environmental_interpretation}</p><h3 className="mb-2 mt-4 text-sm font-semibold text-white">Recommendations</h3><ul className="list-disc space-y-2 pl-5 text-xs leading-6 text-zinc-300">{nugen.monitoring_recommendations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>
+              <div><h3 className="mb-2 text-sm font-semibold text-white">Uncertainty and limitations</h3><ul className="list-disc space-y-2 pl-5 text-xs leading-6 text-zinc-400">{nugen.uncertainty_and_limitations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>
+            </div>
+            <p className="border-t border-white/10 pt-3 text-[11px] text-zinc-500">Historical assessment. R² is not an accuracy percentage. The NUGEN evidence ranking uses a 10-station sample; it does not establish causation or regional exposure.</p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function ReportsPage() {
   const [date, setDate] = useState("2024-11-17");
   const [pollutant, setPollutant] = useState("PM2.5");
@@ -914,6 +1035,8 @@ function ReportsPage() {
           </span>
         }
       />
+
+      <HistoricalIntelligencePanels />
 
       <section className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#080B0A] p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-teal-400/[0.08] blur-3xl" />
