@@ -257,20 +257,37 @@ function WarningsPage() {
   // SUMMARY STATISTICS
   // --------------------------------------------------
 
+  // Only valid, non-negative scored observations
+  // contribute to the above/below baseline summaries.
+
   const aboveBaseline = satellitePoints.filter(
     (point) =>
       point.score_available &&
+      !point.negative_retrieval &&
       point.anomaly_direction === "above_baseline"
   ).length;
 
   const belowBaseline = satellitePoints.filter(
     (point) =>
       point.score_available &&
+      !point.negative_retrieval &&
       point.anomaly_direction === "below_baseline"
   ).length;
 
   const scoredPoints = satellitePoints.filter(
-    (point) => point.score_available
+    (point) =>
+      point.score_available &&
+      !point.negative_retrieval
+  ).length;
+
+  const negativeRetrievals = satellitePoints.filter(
+    (point) => point.negative_retrieval
+  ).length;
+
+  const unscoredPoints = satellitePoints.filter(
+    (point) =>
+      !point.score_available &&
+      !point.negative_retrieval
   ).length;
 
   const lowCoverage = stations.filter((station) =>
@@ -489,14 +506,14 @@ function WarningsPage() {
         <StatCard
           label="Above-baseline points"
           value={String(aboveBaseline)}
-          delta="Sentinel-5P scored observations"
+          delta="Valid non-negative scored observations"
           icon={<Satellite className="h-4 w-4" />}
         />
 
         <StatCard
-          label="Scored grid points"
+          label="Valid scored grid points"
           value={String(scoredPoints)}
-          delta={`${belowBaseline} below baseline`}
+          delta={`${belowBaseline} below · ${negativeRetrievals} negative flagged · ${unscoredPoints} unscored`}
           icon={<ShieldAlert className="h-4 w-4" />}
         />
 
