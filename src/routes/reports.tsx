@@ -1,7 +1,14 @@
 
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileText, Printer, Sparkles } from "lucide-react";
+import {
+  Activity,
+  FileText,
+  Flame,
+  Printer,
+  Satellite,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { Station } from "@/components/strata/LiveDashboardMap";
 import {
@@ -420,9 +427,10 @@ function createReportHtml(snapshot: ReportSnapshot): string {
     minute: "2-digit",
   });
 
-  const title = kind === "Multi-source Summary"
-    ? "Environmental Intelligence Report"
-    : kind;
+  const title =
+    kind === "Multi-source Summary"
+      ? "Environmental Intelligence Report"
+      : kind;
 
   const titleHtml = `
     <div class="brand-row">
@@ -776,10 +784,9 @@ function ReportsPage() {
             `${API}/api/satellite?pollutant=NO2&window_id=11-12`,
             { signal: controller.signal }
           ),
-          fetch(
-            `${API}/api/fires?date=${date}`,
-            { signal: controller.signal }
-          ),
+          fetch(`${API}/api/fires?date=${date}`, {
+            signal: controller.signal,
+          }),
         ]);
 
         if (responses.some((response) => !response.ok)) {
@@ -883,67 +890,136 @@ function ReportsPage() {
   };
 
   return (
-    <>
+    <div className="space-y-5 pb-8">
       <PageHeader
         title="Environmental Reports"
-        subtitle="Prepare and export structured reports from historical environmental observations"
+        subtitle="Prepare, inspect and export structured reports from historical environmental observations."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      {/* Report workspace introduction */}
+      <section className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#080B0A] p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-teal-400/[0.08] blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-cyan-500/[0.05] blur-3xl" />
+
+        <div className="relative flex flex-wrap items-center justify-between gap-5">
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+              <FileText className="h-3.5 w-3.5" />
+              Intelligence reporting workspace
+            </div>
+
+            <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              From observations to clear evidence.
+            </h2>
+
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-400">
+              Build structured environmental reports using the CPCB,
+              Sentinel-5P and VIIRS historical datasets. Preview your
+              document and export it for further use.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/[0.08] bg-black/40 px-4 py-3">
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+              Reporting mode
+            </div>
+            <div className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-zinc-200">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              Historical data
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Source dataset statistics */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
           label="CPCB Stations"
           value={String(stations.length)}
           delta={`${pollutant} · ${date}`}
+          icon={<Activity className="h-4 w-4" />}
         />
+
         <StatCard
           label="Sentinel-5P Grid"
           value={String(satellitePoints.length)}
           delta="Composite-period observations"
+          icon={<Satellite className="h-4 w-4" />}
         />
+
         <StatCard
           label="VIIRS Detections"
           value={String(fires.length)}
           delta={`Historical records · ${date}`}
+          icon={<Flame className="h-4 w-4" />}
         />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <Panel title="Report configuration" simulated={false}>
-            <label className="text-xs text-muted-foreground">
+      {/* Configuration and preview */}
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(300px,0.78fr)_minmax(0,1.75fr)]">
+        <div className="min-w-0 space-y-4">
+          {/* Report configuration */}
+          <Panel
+            title="Report configuration"
+            simulated={false}
+            className="border-white/[0.08] bg-[#080808]"
+          >
+            <div className="mb-4">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                Document settings
+              </div>
+              <p className="text-xs leading-relaxed text-zinc-500">
+                Select the report format and historical observation
+                parameters.
+              </p>
+            </div>
+
+            <label
+              htmlFor="report-kind"
+              className="mb-2 block text-xs font-medium text-zinc-400"
+            >
               Report type
             </label>
             <select
+              id="report-kind"
               value={kind}
               onChange={(event) =>
                 setKind(event.target.value as ReportKind)
               }
-              className="mb-3 mt-1 h-9 w-full rounded-md border bg-surface px-2 text-sm"
+              className="mb-4 h-11 w-full rounded-lg border border-white/10 bg-[#101010] px-3 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
             >
               {REPORT_TYPES.map((item) => (
                 <option key={item}>{item}</option>
               ))}
             </select>
 
-            <label className="text-xs text-muted-foreground">
+            <label
+              htmlFor="report-date"
+              className="mb-2 block text-xs font-medium text-zinc-400"
+            >
               Observation date
             </label>
             <input
+              id="report-date"
               type="date"
               value={date}
               min="2024-11-09"
               max="2024-11-17"
               onChange={(event) => setDate(event.target.value)}
-              className="mb-3 mt-1 h-9 w-full rounded-md border bg-surface px-2 text-sm"
+              className="mb-4 h-11 w-full rounded-lg border border-white/10 bg-[#101010] px-3 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
             />
 
-            <label className="text-xs text-muted-foreground">
+            <label
+              htmlFor="report-pollutant"
+              className="mb-2 block text-xs font-medium text-zinc-400"
+            >
               CPCB pollutant
             </label>
             <select
+              id="report-pollutant"
               value={pollutant}
               onChange={(event) => setPollutant(event.target.value)}
-              className="mt-1 h-9 w-full rounded-md border bg-surface px-2 text-sm"
+              className="h-11 w-full rounded-lg border border-white/10 bg-[#101010] px-3 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/60"
             >
               <option>PM2.5</option>
               <option>PM10</option>
@@ -951,62 +1027,133 @@ function ReportsPage() {
               <option>CO</option>
             </select>
 
-            {loading && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Loading source datasets...
-              </p>
-            )}
-
-            {error && (
-              <div className="mt-3 rounded-md border border-red-500/40 p-2 text-xs text-red-400">
-                {error}
+            <div className="mt-5 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  Available source records
+                </span>
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    loading
+                      ? "animate-pulse bg-amber-400"
+                      : error
+                        ? "bg-red-400"
+                        : "bg-primary"
+                  }`}
+                />
               </div>
-            )}
+
+              <div className="space-y-2.5">
+                <SourceCount
+                  label="CPCB"
+                  count={stations.length}
+                  loading={loading}
+                />
+                <SourceCount
+                  label="Sentinel-5P"
+                  count={satellitePoints.length}
+                  loading={loading}
+                />
+                <SourceCount
+                  label="VIIRS"
+                  count={fires.length}
+                  loading={loading}
+                />
+              </div>
+
+              {loading && (
+                <p className="mt-3 text-[11px] text-zinc-500">
+                  Loading source datasets...
+                </p>
+              )}
+
+              {error && (
+                <div className="mt-3 rounded-lg border border-red-500/25 bg-red-500/[0.06] p-2.5 text-xs text-red-300">
+                  {error}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={generateReport}
               disabled={loading || Boolean(error)}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_0_24px_rgba(0,229,204,0.09)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Sparkles className="h-4 w-4" />
               Generate report
             </button>
 
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Generates a formatted report from actual dataset records.
-              No unsupported predictions or causal conclusions.
+            <p className="mt-3 text-center text-[10px] leading-relaxed text-zinc-500">
+              Reports use returned dataset records. Unsupported
+              predictions and causal conclusions are not added.
             </p>
           </Panel>
 
-          <Panel title="Report library" simulated={false}>
+          {/* Report library */}
+          <Panel
+            title="Report library"
+            simulated={false}
+            className="border-white/[0.08] bg-[#080808]"
+            action={
+              <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[10px] text-zinc-400">
+                {reports.length} reports
+              </span>
+            }
+          >
             {reports.length === 0 ? (
-              <div className="py-7 text-center text-sm text-muted-foreground">
-                <FileText className="mx-auto mb-2 h-7 w-7 opacity-50" />
-                No reports generated yet.
-                <p className="mt-1 text-xs">
-                  Your generated reports will appear here.
+              <div className="rounded-xl border border-dashed border-white/10 py-9 text-center">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-500">
+                  <FileText className="h-5 w-5" />
+                </div>
+
+                <p className="mt-3 text-sm font-medium text-zinc-300">
+                  Your library is empty
+                </p>
+                <p className="mx-auto mt-1 max-w-[220px] text-xs leading-relaxed text-zinc-500">
+                  Generated reports will appear here for quick access
+                  during this browser session.
                 </p>
               </div>
             ) : (
-              <ul className="max-h-[460px] space-y-1 overflow-y-auto">
+              <ul className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
                 {reports.map((report) => (
                   <li key={report.id}>
                     <button
                       onClick={() => setSelectedId(report.id)}
-                      className={`w-full rounded-md border px-2.5 py-2 text-left ${
+                      aria-pressed={report.id === selectedId}
+                      className={`w-full rounded-xl border p-3 text-left transition-all ${
                         report.id === selectedId
-                          ? "border-primary bg-primary/10"
-                          : "border-transparent hover:bg-accent"
+                          ? "border-primary/35 bg-primary/[0.07]"
+                          : "border-white/[0.06] bg-white/[0.015] hover:border-white/[0.13] hover:bg-white/[0.04]"
                       }`}
                     >
-                      <div className="font-mono text-[10px] text-muted-foreground">
-                        {report.id}
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-[10px] text-zinc-500">
+                          {report.id}
+                        </span>
+                        {report.id === selectedId && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary">
+                            Selected
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-1 text-sm">
+
+                      <div className="mt-2 text-sm font-semibold leading-snug text-zinc-200">
                         {report.title}
                       </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
+
+                      <div className="mt-1 text-[11px] text-zinc-500">
                         {report.kind}
+                      </div>
+
+                      <div className="mt-2 text-[10px] text-zinc-600">
+                        {new Date(report.created).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </div>
                     </button>
                   </li>
@@ -1014,21 +1161,23 @@ function ReportsPage() {
               </ul>
             )}
 
-            <p className="mt-3 border-t pt-3 text-[11px] text-muted-foreground">
+            <div className="mt-3 border-t border-white/[0.07] pt-3 text-[10px] leading-relaxed text-zinc-500">
               Reports are stored in the current browser session.
               Persistent storage is not connected.
-            </p>
+            </div>
           </Panel>
         </div>
 
+        {/* Document preview */}
         <Panel
-          title="Report preview"
+          title="Document preview"
           simulated={false}
+          className="min-w-0 border-white/[0.08] bg-[#080808]"
           action={
             current ? (
               <button
                 onClick={printReport}
-                className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs hover:border-primary"
+                className="inline-flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/[0.07] px-3 py-2 text-xs font-semibold text-primary transition-all hover:border-primary/50 hover:bg-primary/[0.13]"
               >
                 <Printer className="h-4 w-4" />
                 Export PDF / Print
@@ -1037,28 +1186,107 @@ function ReportsPage() {
           }
         >
           {!current ? (
-            <div className="flex min-h-[650px] flex-col items-center justify-center text-center">
-              <FileText className="mb-3 h-10 w-10 text-muted-foreground opacity-50" />
-              <h2 className="text-lg font-semibold">
-                Your report preview will appear here
+            <div className="flex min-h-[650px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.015] px-5 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/[0.06] text-primary">
+                <FileText className="h-7 w-7" />
+              </div>
+
+              <h2 className="mt-5 text-lg font-semibold text-zinc-200">
+                Your report preview awaits
               </h2>
-              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Configure your report and generate it to see the
-                formatted document.
+
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
+                Configure your report and select Generate report.
+                Your formatted environmental document will appear
+                here, ready to inspect and export.
               </p>
+
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {[
+                  "Structured summaries",
+                  "Source-specific analysis",
+                  "PDF export",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-[10px] text-zinc-400"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-md border bg-[#e8eef0] p-2">
-              <iframe
-                key={current.id}
-                srcDoc={current.html}
-                title={`Preview of ${current.title}`}
-                className="h-[1100px] w-full rounded-sm bg-white"
-              />
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-zinc-200">
+                    {current.title}
+                  </div>
+                  <div className="mt-1 font-mono text-[10px] text-zinc-500">
+                    {current.id}
+                  </div>
+                </div>
+
+                <span className="rounded-md border border-primary/20 bg-primary/[0.06] px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-primary">
+                  Ready to export
+                </span>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#050505] p-1.5 sm:p-2">
+                <iframe
+                  key={current.id}
+                  srcDoc={current.html}
+                  title={`Preview of ${current.title}`}
+                  className="h-[1100px] w-full rounded-lg bg-white"
+                />
+              </div>
+
+              <p className="text-center text-[10px] text-zinc-500">
+                Preview of the formatted report · Use Export PDF / Print
+                to save or print the document.
+              </p>
             </div>
           )}
         </Panel>
       </div>
-    </>
+
+      {/* Transparency note */}
+      <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
+          <FileText className="h-4 w-4" />
+        </div>
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
+            Reporting transparency
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+            Reports are generated from historical source records and
+            include methodology notes and dataset limitations. The
+            document generator is rule-based; it does not imply that
+            predictive modelling or AI-generated analysis is connected.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SourceCount({
+  label,
+  count,
+  loading,
+}: {
+  label: string;
+  count: number;
+  loading: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-zinc-400">{label}</span>
+      <span className="font-mono text-xs font-medium text-zinc-200">
+        {loading ? "—" : count.toLocaleString()}
+      </span>
+    </div>
   );
 }

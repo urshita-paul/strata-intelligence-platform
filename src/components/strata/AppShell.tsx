@@ -14,6 +14,8 @@ import {
   Search,
   Settings,
   Crosshair,
+  Satellite,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   Popover,
@@ -71,34 +73,39 @@ type FireSearchRecord = {
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
-  { to: "/map", label: "Event Map", icon: Map },
+  { to: "/map", label: "Live Environmental Map", icon: Map },
   { to: "/events", label: "Event Intelligence", icon: Crosshair },
-  { to: "/reports", label: "AI Reports", icon: FileText },
-  { to: "/warnings", label: "Early Warning", icon: AlertTriangle },
+  { to: "/reports", label: "Reports", icon: FileText },
+  { to: "/warnings", label: "Watch Centre", icon: AlertTriangle },
   { to: "/analytics", label: "Historical Analytics", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 function Logo({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <svg viewBox="0 0 32 32" className="h-8 w-8 shrink-0">
-        <rect width="32" height="32" rx="6" fill="var(--primary)" />
-        <path
-          d="M6 11h20M6 16h14M6 21h20"
-          stroke="var(--primary-foreground)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      </svg>
+    <div className="flex items-center gap-3">
+      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-primary/30 bg-primary/10 shadow-[0_0_22px_rgba(45,212,191,0.12)]">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+
+        <svg viewBox="0 0 32 32" className="relative h-7 w-7">
+          <path
+            d="M5 9h22M5 16h16M5 23h22"
+            stroke="var(--primary)"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+          />
+          <circle cx="24" cy="16" r="2.4" fill="var(--primary)" />
+        </svg>
+      </div>
 
       {!collapsed && (
-        <div className="leading-tight">
-          <div className="font-display text-lg font-bold tracking-[0.2em]">
-            STRATA
+        <div className="min-w-0 leading-tight">
+          <div className="font-display text-lg font-bold tracking-[0.17em] text-foreground">
+            STRATA<span className="text-primary">.</span>
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Pollution Intelligence
+
+          <div className="mt-1 text-[9px] font-medium uppercase tracking-[0.19em] text-muted-foreground">
+            Environmental Intelligence
           </div>
         </div>
       )}
@@ -120,7 +127,6 @@ function GlobalSearch() {
 
   const navigate = useNavigate();
 
-  // Load actual observation records from all three APIs.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -164,7 +170,6 @@ function GlobalSearch() {
           detections?: FireSearchRecord[];
         };
 
-        // CPCB search results
         const cpcbResults: SearchResult[] = (
           cpcbData.stations ?? []
         ).map((station) => ({
@@ -184,7 +189,6 @@ function GlobalSearch() {
           ].join(" "),
         }));
 
-        // Sentinel-5P search results
         const satelliteResults: SearchResult[] = (
           satelliteData.points ?? []
         ).map((point) => ({
@@ -208,8 +212,6 @@ function GlobalSearch() {
           ].join(" "),
         }));
 
-        // VIIRS search results.
-        // The key format matches the Events page exactly.
         const fireResults: SearchResult[] = (
           fireData.detections ?? []
         ).map((fire, index) => ({
@@ -237,7 +239,6 @@ function GlobalSearch() {
             ...fireResults,
           ]);
         }
-
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -248,7 +249,6 @@ function GlobalSearch() {
             ? err.message
             : "Unable to load the observation search index."
         );
-
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -261,7 +261,6 @@ function GlobalSearch() {
     return () => controller.abort();
   }, []);
 
-  // Search across all indexed observations.
   const results = useMemo(() => {
     const search = q.trim().toLowerCase();
 
@@ -289,48 +288,63 @@ function GlobalSearch() {
   }
 
   return (
-    <div className="relative w-full max-w-md">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="relative w-full max-w-xl">
+      <div className="group relative">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
 
-      <input
-        value={q}
-        onChange={(event) => {
-          setQ(event.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            setOpen(false);
-          }
+        <input
+          value={q}
+          onChange={(event) => {
+            setQ(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpen(false);
+            }
 
-          if (event.key === "Enter" && results.length > 0) {
-            openResult(results[0]);
-          }
-        }}
-        placeholder="Search stations, grid points, fire detections..."
-        aria-label="Search environmental observations"
-        className="h-9 w-full rounded-md border bg-surface pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
-      />
+            if (event.key === "Enter" && results.length > 0) {
+              openResult(results[0]);
+            }
+          }}
+          placeholder="Search stations, grid points, fire detections..."
+          aria-label="Search environmental observations"
+          className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.035] pl-10 pr-14 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground/70 hover:border-white/[0.14] focus:border-primary/50 focus:bg-primary/[0.035] focus:shadow-[0_0_20px_rgba(45,212,191,0.07)]"
+        />
+
+        <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground sm:block">
+          ENTER
+        </span>
+      </div>
 
       {open && q.trim() && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-lg">
+        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-popover shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+          <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              Observation Search
+            </span>
+
+            <span className="font-mono text-[10px] text-muted-foreground">
+              HISTORICAL INDEX
+            </span>
+          </div>
 
           {loading && (
-            <div className="p-3 text-sm text-muted-foreground">
+            <div className="p-4 text-sm text-muted-foreground">
               Loading environmental observations...
             </div>
           )}
 
           {!loading && error && (
-            <div className="p-3 text-sm text-red-400">
+            <div className="p-4 text-sm text-red-400">
               {error}
             </div>
           )}
 
           {!loading && !error && results.length === 0 && (
-            <div className="p-3 text-sm text-muted-foreground">
+            <div className="p-4 text-sm text-muted-foreground">
               No matching observations in the indexed historical data.
             </div>
           )}
@@ -342,30 +356,30 @@ function GlobalSearch() {
                 event.preventDefault();
                 openResult(result);
               }}
-              className="flex w-full items-center justify-between gap-3 border-b px-3 py-2.5 text-left last:border-0 hover:bg-accent"
+              className="flex w-full items-center justify-between gap-3 border-b border-white/[0.05] px-4 py-3 text-left transition-colors last:border-0 hover:bg-primary/[0.07]"
             >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">
+                <span className="block truncate text-sm font-medium text-foreground">
                   {result.title}
                 </span>
 
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                   {result.subtitle}
                 </span>
 
-                <span className="mt-1 block truncate text-[10px] text-muted-foreground">
+                <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground/80">
                   {result.detail}
                 </span>
               </span>
 
-              <span className="shrink-0 rounded-sm border px-1.5 py-1 text-[9px] uppercase tracking-wider text-muted-foreground">
+              <span className="shrink-0 rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
                 {result.dataset}
               </span>
             </button>
           ))}
 
           {!loading && !error && results.length > 0 && (
-            <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
+            <div className="border-t border-white/[0.07] px-4 py-2.5 text-[10px] text-muted-foreground">
               Showing up to 8 matching historical observations
             </div>
           )}
@@ -404,7 +418,6 @@ function Notifications() {
 
         setStatus("online");
         setMessage(data.message ?? "Backend API is responding.");
-
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -412,7 +425,6 @@ function Notifications() {
 
         setStatus("offline");
         setMessage("Backend API could not be reached.");
-
       }
     }
 
@@ -434,35 +446,39 @@ function Notifications() {
         <button
           aria-label="Data and source status"
           title="Data and source status"
-          className="relative flex h-9 w-9 items-center justify-center rounded-md border bg-surface hover:border-primary"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary/[0.07] hover:text-primary"
         >
           <Bell className="h-4 w-4" />
 
           <span
             className={cn(
-              "absolute right-1.5 top-1.5 h-2 w-2 rounded-full",
-              status === "online" && "bg-emerald-500",
-              status === "offline" && "bg-red-500",
+              "absolute right-2 top-2 h-2 w-2 rounded-full ring-2 ring-background",
+              status === "online" && "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]",
+              status === "offline" && "bg-red-400",
               status === "checking" && "bg-muted-foreground"
             )}
           />
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80 p-0">
-
-        <div className="border-b px-3 py-3">
-          <div className="text-sm font-semibold">
-            Data & Source Status
+      <PopoverContent
+        align="end"
+        className="w-80 overflow-hidden rounded-xl border border-white/10 bg-popover p-0 shadow-2xl"
+      >
+        <div className="border-b border-white/[0.07] bg-white/[0.02] px-4 py-4">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            <div className="text-sm font-semibold text-foreground">
+              Data & Source Status
+            </div>
           </div>
 
-          <div className="mt-1 text-xs text-muted-foreground">
+          <div className="mt-1 pl-6 text-[11px] text-muted-foreground">
             Backend service connectivity
           </div>
         </div>
 
-        <div className="p-3">
-
+        <div className="p-4">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-medium">
               Environmental API
@@ -470,20 +486,20 @@ function Notifications() {
 
             <span
               className={cn(
-                "rounded-sm border px-2 py-1 text-[10px] font-medium",
+                "rounded-full border px-2.5 py-1 text-[10px] font-semibold",
                 status === "online" &&
-                  "border-emerald-500/40 text-emerald-600",
+                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
                 status === "offline" &&
-                  "border-red-500/40 text-red-500",
+                  "border-red-500/30 bg-red-500/10 text-red-400",
                 status === "checking" &&
-                  "text-muted-foreground"
+                  "border-white/10 bg-white/[0.04] text-muted-foreground"
               )}
             >
               {statusLabel}
             </span>
           </div>
 
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
             {status === "online"
               ? message
               : status === "offline"
@@ -491,39 +507,35 @@ function Notifications() {
                 : "Checking the backend health endpoint..."}
           </p>
 
-          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.025] p-3 text-[11px] leading-relaxed text-muted-foreground">
             Historical CPCB, Sentinel-5P and VIIRS observations are
             available through their respective modules. Each module
             loads its dataset independently.
           </p>
-
         </div>
 
-        <div className="grid grid-cols-3 border-t">
-
+        <div className="grid grid-cols-3 border-t border-white/[0.07]">
           <Link
             to="/events"
-            className="border-r px-2 py-2.5 text-center text-xs text-primary hover:bg-accent"
+            className="border-r border-white/[0.07] px-2 py-3 text-center text-xs text-muted-foreground transition-colors hover:bg-primary/[0.06] hover:text-primary"
           >
             Events
           </Link>
 
           <Link
             to="/analytics"
-            className="border-r px-2 py-2.5 text-center text-xs text-primary hover:bg-accent"
+            className="border-r border-white/[0.07] px-2 py-3 text-center text-xs text-muted-foreground transition-colors hover:bg-primary/[0.06] hover:text-primary"
           >
             Analytics
           </Link>
 
           <Link
             to="/warnings"
-            className="px-2 py-2.5 text-center text-xs text-primary hover:bg-accent"
+            className="px-2 py-3 text-center text-xs text-muted-foreground transition-colors hover:bg-primary/[0.06] hover:text-primary"
           >
             Watch Centre
           </Link>
-
         </div>
-
       </PopoverContent>
     </Popover>
   );
@@ -542,105 +554,136 @@ export function AppShell({
 
   return (
     <div className="min-h-screen w-full">
-
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-sidebar transition-[width]",
-          collapsed ? "w-16" : "w-60"
+          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-white/[0.07] bg-sidebar shadow-[12px_0_40px_rgba(0,0,0,0.12)] transition-[width] duration-300",
+          collapsed ? "w-16" : "w-64"
         )}
       >
-
-        <div className="flex h-16 items-center border-b border-sidebar-border px-4">
+        <div className="relative flex h-[76px] items-center border-b border-sidebar-border px-4">
+          <div className="pointer-events-none absolute inset-x-4 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           <Logo collapsed={collapsed} />
         </div>
 
-        <nav className="flex-1 space-y-0.5 p-2">
+        {!collapsed && (
+          <div className="px-5 pb-2 pt-6">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/60">
+              Workspace
+            </div>
+          </div>
+        )}
+
+        <nav className="flex-1 space-y-1 overflow-y-auto px-2.5 py-3">
           {NAV.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
               activeOptions={{ exact: to === "/" }}
               title={label}
-              className="flex items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60"
+              className={cn(
+                "group relative flex min-h-11 items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-medium text-sidebar-foreground/75 transition-all duration-200",
+                "hover:border-white/[0.06] hover:bg-white/[0.035] hover:text-foreground"
+              )}
               activeProps={{
                 className:
-                  "!border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground font-medium",
+                  "!border-primary/15 !bg-primary/[0.10] !text-primary shadow-[inset_0_0_20px_rgba(45,212,191,0.035)]",
               }}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && label}
+              <Icon className="h-[17px] w-[17px] shrink-0 transition-transform duration-200 group-hover:scale-110" />
+
+              {!collapsed && (
+                <span className="truncate">
+                  {label}
+                </span>
+              )}
+
+              {!collapsed && (
+                <ArrowUpRight className="ml-auto h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-40" />
+              )}
             </Link>
           ))}
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
-
           {!collapsed && (
-            <div className="mb-3 rounded-md bg-sidebar-accent/50 p-2.5 text-[11px] text-muted-foreground">
+            <div className="mb-4 overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.09] to-transparent p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Satellite className="h-3.5 w-3.5" />
+                </div>
 
-              <div className="flex items-center gap-1.5 text-sidebar-foreground">
-                <Activity className="h-3 w-3 text-primary" />
-                Historical observation environment
+                <div className="text-[11px] font-semibold text-foreground">
+                  Data Environment
+                </div>
               </div>
 
-              CPCB, Sentinel-5P and VIIRS datasets are connected.
-              Predictive model integration is pending.
+              <div className="text-[10px] leading-relaxed text-muted-foreground">
+                CPCB, Sentinel-5P and VIIRS datasets are connected.
+                Predictive model integration is pending.
+              </div>
 
+              <div className="mt-3 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-400">
+                  Historical data
+                </span>
+              </div>
             </div>
           )}
 
           <button
             onClick={() => setCollapsed((current) => !current)}
-            className="flex w-full items-center justify-center gap-2 rounded-md py-1.5 text-xs text-muted-foreground hover:bg-sidebar-accent/60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent py-2 text-xs text-muted-foreground transition-all hover:border-white/[0.06] hover:bg-white/[0.04] hover:text-foreground"
             aria-label="Toggle sidebar"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
               <PanelLeftOpen className="h-4 w-4" />
             ) : (
               <>
                 <PanelLeftClose className="h-4 w-4" />
-                Collapse
+                Collapse sidebar
               </>
             )}
           </button>
-
         </div>
       </aside>
 
       <div
         className={cn(
-          "transition-[padding]",
-          collapsed ? "pl-16" : "pl-60"
+          "min-h-screen transition-[padding] duration-300",
+          collapsed ? "pl-16" : "pl-64"
         )}
       >
-
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/90 px-6 backdrop-blur">
-
+        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between gap-4 border-b border-white/[0.07] bg-background/80 px-5 backdrop-blur-2xl md:px-7">
           <GlobalSearch />
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="hidden items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.025] px-3 py-2 lg:flex">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-30" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
 
-            <span className="hidden items-center gap-1.5 font-mono text-xs text-muted-foreground md:flex">
-              <span className="h-2 w-2 rounded-full bg-primary" />
-              Historical datasets
-            </span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+                Historical datasets
+              </span>
+            </div>
 
             <Notifications />
 
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-xs font-semibold">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-gradient-to-br from-primary/20 to-primary/[0.04] font-display text-xs font-bold text-primary shadow-[0_0_18px_rgba(45,212,191,0.08)]">
               UP
             </div>
-
           </div>
-
         </header>
 
-        <main className="p-6">
-          {children}
+        <main className="min-h-[calc(100vh-76px)] p-4 md:p-6 lg:p-7">
+          <div className="mx-auto w-full max-w-[1800px]">
+            {children}
+          </div>
         </main>
-
       </div>
-
     </div>
   );
 }
