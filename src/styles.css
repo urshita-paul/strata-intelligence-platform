@@ -63,29 +63,29 @@
 :root {
   color-scheme: dark;
   --radius: 0.5rem;
-  --background: oklch(0.155 0.025 255);
-  --surface: oklch(0.185 0.024 255);
-  --panel: oklch(0.205 0.024 255);
-  --elevated: oklch(0.235 0.025 255);
-  --foreground: oklch(0.95 0.008 230);
-  --card: oklch(0.205 0.024 255);
-  --card-foreground: oklch(0.95 0.008 230);
-  --popover: oklch(0.225 0.026 255);
-  --popover-foreground: oklch(0.95 0.008 230);
-  --primary: oklch(0.76 0.105 178);
-  --primary-foreground: oklch(0.16 0.025 240);
-  --secondary: oklch(0.265 0.025 255);
-  --secondary-foreground: oklch(0.92 0.008 230);
-  --muted: oklch(0.255 0.022 255);
-  --muted-foreground: oklch(0.685 0.022 240);
-  --accent: oklch(0.285 0.035 215);
-  --accent-foreground: oklch(0.96 0.008 230);
+  --background: #071A1B;
+  --surface: #0B2425;
+  --panel: #0D292A;
+  --elevated: #103536;
+  --foreground: #F1F5F2;
+  --card: var(--panel);
+  --card-foreground: var(--foreground);
+  --popover: #103536;
+  --popover-foreground: var(--foreground);
+  --primary: #16B8A6;
+  --primary-foreground: #071A1B;
+  --secondary: #103536;
+  --secondary-foreground: #F1F5F2;
+  --muted: #143334;
+  --muted-foreground: #91A5A2;
+  --accent: #164445;
+  --accent-foreground: #F1F5F2;
   --destructive: oklch(0.66 0.19 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.315 0.025 255);
-  --input: oklch(0.34 0.025 255);
-  --ring: oklch(0.76 0.105 178);
-  --success: oklch(0.74 0.145 155);
+  --border: #214243;
+  --input: #2B5050;
+  --ring: #83E0C6;
+  --success: #83E0C6;
   --satellite: oklch(0.72 0.105 235);
   --fire: oklch(0.75 0.145 52);
   --caution: oklch(0.81 0.125 85);
@@ -95,19 +95,21 @@
   --moderate: oklch(0.81 0.125 85);
   --low: oklch(0.74 0.145 155);
   --sim: oklch(0.78 0.11 75);
-  --chart-1: oklch(0.76 0.105 178);
+  --chart-1: #83E0C6;
   --chart-2: oklch(0.75 0.145 52);
   --chart-3: oklch(0.72 0.105 235);
   --chart-4: oklch(0.66 0.19 25);
-  --chart-5: oklch(0.74 0.145 155);
-  --sidebar: oklch(0.125 0.025 255);
-  --sidebar-foreground: oklch(0.79 0.018 235);
-  --sidebar-primary: oklch(0.76 0.105 178);
-  --sidebar-primary-foreground: oklch(0.16 0.025 240);
-  --sidebar-accent: oklch(0.22 0.032 225);
-  --sidebar-accent-foreground: oklch(0.96 0.008 230);
-  --sidebar-border: oklch(0.255 0.025 255);
-  --sidebar-ring: oklch(0.76 0.105 178);
+  --chart-5: #C6E67A;
+  --sidebar: #081E1F;
+  --sidebar-foreground: #91A5A2;
+  --sidebar-primary: #83E0C6;
+  --sidebar-primary-foreground: #071A1B;
+  --sidebar-accent: #103536;
+  --sidebar-accent-foreground: #F1F5F2;
+  --sidebar-border: #1A3839;
+  --sidebar-ring: #83E0C6;
+  --mint: #83E0C6;
+  --lime: #C6E67A;
   --shadow-panel: 0 16px 45px -28px oklch(0.03 0.02 255 / 0.8);
   --shadow-float: 0 22px 55px -20px oklch(0.03 0.02 255 / 0.85);
 }
@@ -123,7 +125,7 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0; }
   button, a, input, select { -webkit-tap-highlight-color: transparent; }
   button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
     outline: 2px solid var(--ring);
@@ -208,7 +210,7 @@
 }
 
 .leaflet-container { background: var(--surface); color: var(--foreground); font-family: var(--font-sans); }
-.leaflet-tile-pane { filter: brightness(0.68) saturate(0.58) hue-rotate(175deg); }
+.leaflet-tile-pane { filter: invert(1) hue-rotate(155deg) saturate(0.45) brightness(0.76); }
 .leaflet-control-zoom { border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; overflow: hidden; box-shadow: var(--shadow-panel) !important; }
 .leaflet-control-zoom a { background: var(--popover); color: var(--foreground); border-color: var(--border); }
 .leaflet-control-zoom a:hover { background: var(--accent); }
@@ -235,6 +237,54 @@
 
 @utility pulse-ring { animation: pulse-ring 2s ease-out infinite; transform-origin: center; transform-box: fill-box; }
 @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(3); opacity: 0; } }
+
+@theme inline {
+  --color-mint: var(--mint);
+  --color-lime: var(--lime);
+}
+
+.nexus-shell { background: var(--background); }
+.nexus-sidebar { background: linear-gradient(180deg, var(--sidebar), var(--background)); }
+.nexus-navigation .active { background: linear-gradient(90deg, color-mix(in oklab, var(--primary) 14%, transparent), transparent); color: var(--foreground); }
+.nexus-navigation .active svg { color: var(--mint); }
+.nexus-navigation .active .nav-indicator { box-shadow: 0 0 12px color-mix(in oklab, var(--mint) 25%, transparent); }
+.nexus-mark { flex-shrink: 0; }
+.nexus-mark-connecting { animation: nexus-connect 2.5s ease-in-out infinite; }
+@keyframes nexus-connect { 0%,100% { opacity: .4; transform: translateY(2px); } 50% { opacity: 1; transform: translateY(-2px); } }
+.nexus-eyebrow { display: flex; align-items: center; gap: .6rem; font-family: var(--font-mono); font-size: .6rem; text-transform: uppercase; letter-spacing: .12em; color: var(--mint); }
+.nexus-eyebrow::before { content: ''; width: 1.4rem; height: 1px; background: var(--primary); }
+.nexus-heading { font-size: 2.75rem; line-height: 1.13; font-weight: 500; max-width: 800px; }
+.nexus-filterbar { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.nexus-filterbar .control-input { background: transparent; border-color: transparent; border-bottom-color: var(--border); padding-left: 0; border-radius: 0; }
+.nexus-filterbar .control-input:focus { box-shadow: none; border-bottom-color: var(--mint); }
+.nexus-filterbar .control-label { font-size: .58rem; }
+.nexus-map-stage { position: relative; height: 560px; overflow: hidden; background: var(--surface); }
+.nexus-map-stage .leaflet-control-zoom { margin-top: 66px; }
+.nexus-map-stage::after { content: ''; pointer-events: none; position: absolute; inset: 0; z-index: 400; box-shadow: inset 0 0 65px color-mix(in oklab, var(--background) 30%, transparent); }
+.nexus-map-stage .leaflet-container { min-height: 100%; }
+.nexus-section-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding-bottom: 1rem; }
+.nexus-section-header h2 { font-size: .8rem; font-weight: 500; }
+.nexus-measurement { display: block; padding: 1.4rem 0; border-bottom: 1px solid var(--border); }
+.nexus-measurement:last-child { border-bottom: 0; }
+.nexus-measurement:hover .nexus-measurement-value { color: var(--mint); }
+.nexus-measurement-value { min-height: 2.8rem; font-family: var(--font-display); font-size: 2.4rem; font-weight: 500; line-height: 1.2; transition: color 180ms; }
+.nexus-skeleton { background: linear-gradient(90deg, var(--surface), var(--accent), var(--surface)); background-size: 200% 100%; animation: nexus-shimmer 2s ease infinite; }
+@keyframes nexus-shimmer { to { background-position: -200% 0; } }
+.nexus-bottom-band { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
+.nexus-bottom-band > * { padding: 1.25rem 0; }
+.nexus-bottom-band > * + * { border-left: 1px solid var(--border); padding-left: 1.5rem; }
+.nexus-ledger .data-table th { padding-left: 0; }
+.nexus-ledger .data-table td { padding-left: 0; padding-top: 1rem; padding-bottom: 1rem; }
+.nexus-methodology { border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: .7rem; line-height: 1.7; }
+.nexus-methodology summary { cursor: pointer; padding: 1rem 0; color: var(--foreground); }
+@media (max-width: 1100px) { .nexus-heading { font-size: 2.25rem; } .nexus-map-stage { height: 500px; } }
+@media (max-width: 640px) {
+  .nexus-heading { font-size: 1.9rem; }
+  .nexus-map-stage { height: 430px; }
+  .nexus-bottom-band { grid-template-columns: 1fr; }
+  .nexus-bottom-band > * + * { border-left: 0; border-top: 1px solid var(--border); padding-left: 0; }
+  .nexus-measurement { padding: 1rem 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

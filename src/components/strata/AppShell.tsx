@@ -21,6 +21,8 @@ import {
   Crosshair,
   X,
 } from "lucide-react";
+import { NexusMark } from "@/components/strata/NexusMark";
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DatasetBadge, DatasetIcon, type Dataset } from "@/components/strata/ui";
 import { useAppState } from "@/components/strata/AppState";
@@ -52,14 +54,10 @@ const NAV = [
 ] as const;
 
 function Logo({ collapsed = false }: { collapsed?: boolean }) {
-  return (
-    <Link to="/" className="flex items-center gap-3" aria-label="STRATA overview">
-      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary shadow-[0_0_24px_color-mix(in_oklab,var(--primary)_16%,transparent)]">
-        <svg viewBox="0 0 28 28" className="h-6 w-6" aria-hidden="true"><path d="M5 8h18M5 14h12M5 20h18" stroke="var(--primary-foreground)" strokeWidth="2.4" strokeLinecap="round" /></svg>
-      </span>
-      {!collapsed && <span className="leading-tight"><span className="block font-display text-lg font-bold tracking-[0.21em] text-foreground">STRATA</span><span className="mt-0.5 block text-[9px] uppercase tracking-[0.12em] text-muted-foreground">Environmental intelligence</span></span>}
-    </Link>
-  );
+  return <Link to="/" className="flex min-w-0 items-center gap-2.5" aria-label="STRATA NEXUS overview">
+    <NexusMark className="h-10 w-10 text-mint" />
+    {!collapsed && <span className="min-w-0 leading-tight"><span className="block font-display text-[15px] font-semibold text-foreground">STRATA <span className="font-normal text-mint">NEXUS</span></span><span className="mt-1 block font-mono text-[8px] uppercase tracking-widest text-muted-foreground">Environmental intelligence</span></span>}
+  </Link>;
 }
 
 function useApiStatus() {
@@ -180,16 +178,16 @@ function GlobalSearch() {
           if (event.key === "ArrowUp" && results.length > 0) { event.preventDefault(); setActiveIndex((index) => (index - 1 + results.length) % results.length); }
           if (event.key === "Enter" && results[activeIndex]) { event.preventDefault(); openResult(results[activeIndex]); }
         }}
-        placeholder="Search stations, grid points or detections…"
+        placeholder="Search environmental observations…"
         aria-label="Search environmental observations"
         role="combobox"
         aria-expanded={open && Boolean(q.trim())}
         aria-controls="global-search-results"
         aria-activedescendant={open && results[activeIndex] ? `global-search-option-${activeIndex}` : undefined}
         aria-autocomplete="list"
-        className="control-input w-full pl-9 pr-16"
+        className="control-input h-10 w-full border-transparent bg-surface/60 pl-9 pr-4 focus:border-primary/40"
       />
-      <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border bg-background/60 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground sm:block">↑↓ ↵</span>
+
       {open && q.trim() && (
         <div id="global-search-results" ref={listRef} role="listbox" aria-label="Environmental search results" className="dropdown-enter absolute left-0 right-0 z-50 mt-2 max-h-[min(560px,70vh)] overflow-y-auto rounded-lg border bg-popover shadow-[var(--shadow-float)]">
           <div className="flex items-center justify-between border-b px-3 py-2.5"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Historical observation search</span><span className="font-mono text-[9px] text-muted-foreground">3 sources</span></div>
@@ -204,7 +202,7 @@ function GlobalSearch() {
               {group.map((result) => {
                 resultIndex += 1;
                 const index = resultIndex;
-                return <button
+                return <Button
                   id={`global-search-option-${index}`}
                   data-search-index={index}
                   role="option"
@@ -212,12 +210,12 @@ function GlobalSearch() {
                   key={`${result.dataset}-${result.key}`}
                   onMouseDown={(event) => { event.preventDefault(); openResult(result); }}
                   onMouseEnter={() => setActiveIndex(index)}
-                  className={cn("flex w-full items-center gap-3 border-b border-border/50 px-3 py-3 text-left transition-colors last:border-0", activeIndex === index ? "bg-accent" : "hover:bg-accent/60")}
+                  variant="ghost" className={cn("h-auto justify-start whitespace-normal rounded-none flex w-full items-center gap-3 border-b border-border/50 px-3 py-3 text-left transition-colors last:border-0", activeIndex === index ? "bg-accent" : "hover:bg-accent/60")}
                 >
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{result.title}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{result.subtitle}</span><span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">{result.detail}</span></span>
                   <DatasetBadge dataset={result.dataset} />
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                </button>;
+                </Button>;
               })}
             </div>;
           })}
@@ -232,7 +230,7 @@ function Notifications({ status, message }: { status: ApiStatus; message: string
   const statusLabel = status === "online" ? "Connected" : status === "offline" ? "Unavailable" : "Checking";
   return (
     <Popover>
-      <PopoverTrigger asChild><button aria-label="Data and source status" title="Data and source status" className="icon-button relative"><Bell className="h-4 w-4" /><span className={cn("absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full", status === "online" && "bg-success", status === "offline" && "bg-critical", status === "checking" && "bg-caution")} /></button></PopoverTrigger>
+      <PopoverTrigger asChild><Button aria-label="Data and source status" title="Data and source status" variant="ghost" size="icon" className="icon-button relative border-transparent bg-transparent"><Bell className="h-4 w-4" /><span className={cn("absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full", status === "online" && "bg-success", status === "offline" && "bg-critical", status === "checking" && "bg-caution")} /></Button></PopoverTrigger>
       <PopoverContent align="end" className="dropdown-enter w-84 p-0">
         <div className="border-b px-4 py-3.5"><div className="text-sm font-semibold">Data & source status</div><div className="mt-1 text-xs text-muted-foreground">Live service connectivity, not a notification feed</div></div>
         <div className="p-4"><div className="flex items-center justify-between gap-3"><span className="text-sm font-medium">Environmental API</span><span className={cn("inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[10px] font-medium", status === "online" && "border-success/35 bg-success/10 text-success", status === "offline" && "border-critical/35 bg-critical/10 text-critical", status === "checking" && "border-caution/35 text-caution")}>{status === "online" && <Check className="h-3 w-3" />}{statusLabel}</span></div><p className="mt-3 text-xs leading-relaxed text-muted-foreground">{message}</p><p className="mt-3 border-t pt-3 text-[11px] leading-relaxed text-muted-foreground">CPCB, Sentinel-5P and VIIRS modules load their datasets independently. Endpoint availability does not certify data completeness.</p></div>
@@ -244,7 +242,7 @@ function Notifications({ status, message }: { status: ApiStatus; message: string
 
 function ProfileMenu() {
   const { settings } = useAppState();
-  return <Popover><PopoverTrigger asChild><button className="flex h-10 items-center gap-2 rounded-md border border-transparent px-1.5 text-left transition-colors hover:border-border hover:bg-surface" aria-label="Open workspace profile"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-primary"><CircleUserRound className="h-4 w-4" /></span><span className="hidden xl:block"><span className="block text-xs font-medium">Analyst workspace</span><span className="block max-w-32 truncate text-[10px] text-muted-foreground">{settings.org}</span></span></button></PopoverTrigger><PopoverContent align="end" className="dropdown-enter w-72 p-0"><div className="border-b p-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/12 text-primary"><Building2 className="h-5 w-5" /></span><div className="min-w-0"><div className="truncate text-sm font-semibold">{settings.org}</div><div className="truncate text-xs text-muted-foreground">{settings.email}</div></div></div></div><div className="p-2"><Link to="/settings" className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm hover:bg-accent"><Settings className="h-4 w-4 text-muted-foreground" />Workspace settings<ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" /></Link></div><div className="border-t px-4 py-3 text-[10px] leading-relaxed text-muted-foreground">Session-only workspace. Account authentication is not connected.</div></PopoverContent></Popover>;
+  return <Popover><PopoverTrigger asChild><Button variant="ghost" className="flex h-10 items-center gap-2 rounded-md border border-transparent px-1.5 text-left transition-colors hover:border-border hover:bg-surface" aria-label="Open workspace profile"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-primary"><CircleUserRound className="h-4 w-4" /></span><span className="hidden xl:block"><span className="block text-xs font-medium">Analyst workspace</span><span className="block max-w-32 truncate text-[10px] text-muted-foreground">{settings.org}</span></span></Button></PopoverTrigger><PopoverContent align="end" className="dropdown-enter w-72 p-0"><div className="border-b p-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/12 text-primary"><Building2 className="h-5 w-5" /></span><div className="min-w-0"><div className="truncate text-sm font-semibold">{settings.org}</div><div className="truncate text-xs text-muted-foreground">{settings.email}</div></div></div></div><div className="p-2"><Link to="/settings" className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm hover:bg-accent"><Settings className="h-4 w-4 text-muted-foreground" />Workspace settings<ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" /></Link></div><div className="border-t px-4 py-3 text-[10px] leading-relaxed text-muted-foreground">Session-only workspace. Account authentication is not connected.</div></PopoverContent></Popover>;
 }
 
 function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
@@ -252,13 +250,13 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     <div className={cn("flex h-[72px] shrink-0 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "px-5")}><Logo collapsed={collapsed} /></div>
     <div className={cn("py-4", collapsed ? "px-2" : "px-3")}>
       {!collapsed && <div className="mb-3 px-2 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Intelligence modules</div>}
-      <nav className="space-y-1" aria-label="Main navigation">{NAV.map(({ to, label, description, icon: Icon }) => <Link key={to} to={to} search={to === "/events" ? { dataset: "CPCB", q: "", id: "" } : {}} activeOptions={{ exact: to === "/" }} onClick={onNavigate} title={collapsed ? label : undefined} className={cn("group relative flex items-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground", collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2.5")} activeProps={{ className: "active bg-sidebar-accent text-sidebar-accent-foreground" }}>
+      <nav className="nexus-navigation space-y-1.5" aria-label="Main navigation">{NAV.map(({ to, label, description, icon: Icon }) => <Link key={to} to={to} search={to === "/events" ? { dataset: "CPCB", q: "", id: "" } : {}} activeOptions={{ exact: to === "/" }} onClick={onNavigate} title={collapsed ? label : undefined} className={cn("group relative flex items-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground", collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3")} activeProps={{ className: "active text-sidebar-accent-foreground" }}>
         <span className="nav-indicator absolute bottom-2 left-0 top-2 w-0.5 origin-center scale-y-0 rounded-full bg-sidebar-primary transition-transform group-[.active]:scale-y-100" />
         <Icon className="h-[17px] w-[17px] shrink-0" />
         {!collapsed && <span className="min-w-0"><span className="block text-[13px] font-medium">{label}</span><span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{description}</span></span>}
       </Link>)}</nav>
     </div>
-    <div className="mt-auto p-3">{!collapsed && <div className="mb-3 rounded-lg border border-sidebar-border bg-sidebar-accent/35 p-3"><div className="flex items-center gap-2 text-[11px] font-medium text-sidebar-foreground"><Activity className="h-3.5 w-3.5 text-primary" />Historical observation environment</div><p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">Three real data sources connected through the environmental API. Predictive model integration remains pending.</p></div>}</div>
+    <div className="mt-auto p-5">{!collapsed && <><div className="mb-4 h-px bg-sidebar-border" /><p className="font-display text-sm leading-relaxed text-foreground/80">Understand the signals<br />shaping our environment.</p><div className="mt-5 flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider text-muted-foreground"><span className="h-1.5 w-1.5 bg-lime" />Historical archive</div><p className="mt-2 text-[10px] text-muted-foreground">Predictive model · pending</p></>}</div>
   </>;
 }
 
@@ -269,20 +267,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { status, message } = useApiStatus();
   useEffect(() => setMobileOpen(false), [location.pathname]);
   return (
-    <div className="min-h-screen w-full">
-      <aside className={cn("fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex", collapsed ? "w-[76px]" : "w-64")}><SidebarContent collapsed={collapsed} /><div className="border-t border-sidebar-border p-3"><button onClick={() => setCollapsed((current) => !current)} className={cn("flex w-full items-center rounded-md py-2 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground", collapsed ? "justify-center" : "justify-center gap-2")} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <><PanelLeftClose className="h-4 w-4" />Collapse navigation</>}</button></div></aside>
-      {mobileOpen && <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-label="Close navigation overlay" /><aside className="dropdown-enter absolute inset-y-0 left-0 flex w-[min(86vw,300px)] flex-col border-r border-sidebar-border bg-sidebar shadow-[var(--shadow-float)]"><button onClick={() => setMobileOpen(false)} className="icon-button absolute right-3 top-4 z-10" aria-label="Close navigation"><X className="h-4 w-4" /></button><SidebarContent collapsed={false} onNavigate={() => setMobileOpen(false)} /></aside></div>}
+    <div className="nexus-shell min-h-screen w-full">
+      <aside className={cn("nexus-sidebar fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex", collapsed ? "w-[76px]" : "w-64")}><SidebarContent collapsed={collapsed} /><div className="border-t border-sidebar-border p-3"><Button variant="ghost" onClick={() => setCollapsed((current) => !current)} className={cn("flex w-full items-center rounded-md py-2 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground", collapsed ? "justify-center" : "justify-center gap-2")} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}</Button></div></aside>
+      {mobileOpen && <div className="fixed inset-0 z-50 lg:hidden"><Button variant="ghost" className="absolute inset-0 h-full w-full rounded-none bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-label="Close navigation overlay" /><aside className="dropdown-enter absolute inset-y-0 left-0 flex w-[min(86vw,300px)] flex-col border-r border-sidebar-border bg-sidebar shadow-[var(--shadow-float)]"><Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="icon-button absolute right-3 top-4 z-10" aria-label="Close navigation"><X className="h-4 w-4" /></Button><SidebarContent collapsed={false} onNavigate={() => setMobileOpen(false)} /></aside></div>}
       <div className={cn("transition-[padding] duration-200", collapsed ? "lg:pl-[76px]" : "lg:pl-64")}>
         <header className="sticky top-0 z-30 flex min-h-[72px] items-center gap-3 border-b bg-background/88 px-3 backdrop-blur-xl sm:px-5 lg:px-6">
-          <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu className="h-4 w-4" /></button>
+          <Button variant="ghost" size="icon" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu className="h-4 w-4" /></Button>
           <div className="min-w-0 flex-1"><GlobalSearch /></div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="mr-1 hidden items-center gap-2 rounded-full border bg-surface/70 px-3 py-1.5 md:flex"><span className={cn("h-1.5 w-1.5 rounded-full", status === "online" ? "bg-success" : status === "offline" ? "bg-critical" : "bg-caution")} /><span className="text-[10px] font-medium text-muted-foreground">{status === "online" ? "Data service online" : status === "offline" ? "Data service unavailable" : "Checking data service"}</span></div>
+            <div className="mr-1 hidden items-center gap-2 border-l border-border pl-4 py-1.5 md:flex"><span className={cn("h-1.5 w-1.5 rounded-full", status === "online" ? "bg-success" : status === "offline" ? "bg-critical" : "bg-caution")} /><span className="text-[10px] font-medium text-muted-foreground">{status === "online" ? "Data service online" : status === "offline" ? "Data service unavailable" : "Checking data service"}</span></div>
             <Notifications status={status} message={message} />
             <ProfileMenu />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1800px] p-3 sm:p-5 lg:p-6"><div key={location.pathname} className="page-enter">{children}</div></main>
+        <main className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-7 sm:py-8 lg:px-9"><div key={location.pathname} className="page-enter">{children}</div></main>
       </div>
     </div>
   );
