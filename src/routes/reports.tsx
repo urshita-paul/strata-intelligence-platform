@@ -1,5 +1,3 @@
-```
-
 
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -757,125 +755,6 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-
-
-type NugenStation = {
-  station_id: string;
-  station_name: string;
-  ground_PM2.5_mean: number;
-  predicted_PM25?: number;
-  absolute_error: number;
-};
-
-type NugenReport = {
-  executive_summary: string;
-  hotspot_analysis: {
-    top_3_observed_stations: NugenStation[];
-    top_3_prediction_errors: NugenStation[];
-  };
-  model_reliability_analysis: { R2: number; RMSE: number; MAE: number; bias: number };
-  environmental_interpretation: string;
-  monitoring_recommendations: string[];
-  uncertainty_and_limitations: string[];
-};
-
-function NugenIntelligencePanel() {
-  const [report, setReport] = useState<NugenReport | null>(null);
-  const [failure, setFailure] = useState("");
-  const [pending, setPending] = useState(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/ml-data/strata_nugen_report.json", { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error(`Report unavailable (HTTP ${response.status})`);
-        return response.json() as Promise<NugenReport>;
-      })
-      .then((data) => { if (!controller.signal.aborted) setReport(data); })
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) setFailure(err instanceof Error ? err.message : "Could not load report");
-      })
-      .finally(() => { if (!controller.signal.aborted) setPending(false); });
-    return () => controller.abort();
-  }, []);
-
-  return (
-    <section className="rounded-2xl border border-teal-400/25 bg-[#080B0A] p-5 sm:p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-400">NUGEN-powered intelligence</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">Historical PM2.5 Event Assessment</h2>
-          <p className="mt-1 text-xs text-zinc-400">8–14 November 2024 · XGBoost prior-only forecast evaluation · Historical, not live</p>
-        </div>
-        <span className="rounded-full border border-teal-400/25 px-3 py-1 text-xs text-teal-300">AI-assisted analysis</span>
-      </div>
-      {pending && <p className="text-sm text-zinc-400">Loading NUGEN report…</p>}
-      {failure && <p className="text-sm text-red-400">{failure}. Check public/ml-data and deployment.</p>}
-      {report && (
-        <div className="space-y-5">
-          <p className="text-sm leading-7 text-zinc-300">{report.executive_summary}</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {([
-              ["MAE", report.model_reliability_analysis.MAE.toFixed(2), "µg/m³"],
-              ["RMSE", report.model_reliability_analysis.RMSE.toFixed(2), "µg/m³"],
-              ["R²", report.model_reliability_analysis.R2.toFixed(3), "variance explained"],
-              ["Bias", report.model_reliability_analysis.bias.toFixed(2), "µg/m³"],
-            ] as const).map(([label, value, unit]) => (
-              <div key={label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-xs text-zinc-400">{label}</p>
-                <p className="mt-1 text-xl font-semibold text-teal-300">{value}</p>
-                <p className="text-[10px] text-zinc-500">{unit}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-zinc-500">Metrics evaluate 91 stations. The station rankings below cover only the 10 supplied evidence stations. R² is not an accuracy percentage.</p>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-white/10 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-white">Highest observed PM2.5 · supplied sample</h3>
-              <div className="space-y-3">
-                {report.hotspot_analysis.top_3_observed_stations.map((station) => (
-                  <div key={station.station_id} className="flex items-start justify-between gap-3 text-xs">
-                    <span className="text-zinc-300">{station.station_name}</span>
-                    <span className="shrink-0 font-semibold text-teal-300">{station.ground_PM2.5_mean.toFixed(2)} µg/m³</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-xl border border-white/10 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-white">Largest prediction errors · supplied sample</h3>
-              <div className="space-y-3">
-                {report.hotspot_analysis.top_3_prediction_errors.map((station) => (
-                  <div key={station.station_id} className="flex items-start justify-between gap-3 text-xs">
-                    <span className="text-zinc-300">{station.station_name}</span>
-                    <span className="shrink-0 font-semibold text-amber-300">{station.absolute_error.toFixed(2)} µg/m³</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-white">Environmental interpretation</h3>
-              <p className="text-xs leading-6 text-zinc-400">{report.environmental_interpretation}</p>
-              <h3 className="mb-2 mt-4 text-sm font-semibold text-white">Recommendations</h3>
-              <ul className="list-disc space-y-2 pl-5 text-xs leading-6 text-zinc-300">
-                {report.monitoring_recommendations.map((item, index) => <li key={index}>{item}</li>)}
-              </ul>
-            </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-white">Evidence limitations</h3>
-              <ul className="list-disc space-y-2 pl-5 text-xs leading-6 text-zinc-400">
-                {report.uncertainty_and_limitations.map((item, index) => <li key={index}>{item}</li>)}
-              </ul>
-            </div>
-          </div>
-          <p className="border-t border-white/10 pt-3 text-[11px] text-zinc-500">This is a saved NUGEN-generated interpretation of historical model outputs, not live NUGEN inference or an official air-quality advisory.</p>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function ReportsPage() {
   const [date, setDate] = useState("2024-11-17");
   const [pollutant, setPollutant] = useState("PM2.5");
@@ -1035,8 +914,6 @@ function ReportsPage() {
           </span>
         }
       />
-
-      <NugenIntelligencePanel />
 
       <section className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#080B0A] p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-teal-400/[0.08] blur-3xl" />
@@ -1434,4 +1311,3 @@ function ReportsPage() {
     </div>
   );
 }
-```
