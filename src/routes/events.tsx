@@ -22,6 +22,11 @@ const API =
 
 type Dataset = "CPCB" | "Sentinel-5P" | "VIIRS";
 
+const isDataset = (value: unknown): value is Dataset =>
+  value === "CPCB" ||
+  value === "Sentinel-5P" ||
+  value === "VIIRS";
+
 type SatellitePoint = {
   point_id: string;
   grid_lat: number;
@@ -61,6 +66,14 @@ type ObservationRow = {
 };
 
 export const Route = createFileRoute("/events")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    dataset: isDataset(search.dataset)
+      ? search.dataset
+      : "CPCB",
+    q: typeof search.q === "string" ? search.q : "",
+    id: typeof search.id === "string" ? search.id : "",
+  }),
+
   head: () => ({
     meta: [
       { title: "Environmental Observations — STRATA" },
@@ -79,6 +92,8 @@ export const Route = createFileRoute("/events")({
 });
 
 function EventsPage() {
+  const routeSearch = Route.useSearch();
+
   const [dataset, setDataset] = useState<Dataset>("CPCB");
   const [date, setDate] = useState("2024-11-17");
   const [pollutant, setPollutant] = useState("PM2.5");
@@ -95,6 +110,18 @@ function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Apply global search parameters when navigating from AppShell.
+  useEffect(() => {
+    setDataset(routeSearch.dataset);
+    setQuery(routeSearch.q);
+    setSelectedId(routeSearch.id);
+  }, [
+    routeSearch.dataset,
+    routeSearch.q,
+    routeSearch.id,
+  ]);
+
+  // Load observations from the production API.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -119,7 +146,9 @@ function EventsPage() {
         ]);
 
         if (responses.some((response) => !response.ok)) {
-          throw new Error("One or more environmental data requests failed.");
+          throw new Error(
+            "One or more environmental data requests failed."
+          );
         }
 
         const cpcbData = (await responses[0].json()) as {
@@ -159,6 +188,7 @@ function EventsPage() {
     return () => controller.abort();
   }, [date, pollutant, satellitePollutant]);
 
+  // Build observation rows for the selected source.
   const allRows = useMemo<ObservationRow[]>(() => {
     if (dataset === "CPCB") {
       return stations.map((station) => ({
@@ -195,13 +225,14 @@ function EventsPage() {
     }));
   }, [dataset, stations, satellitePoints, fires]);
 
+  // Include record IDs so exact IDs from global search match.
   const filteredRows = useMemo(() => {
     const search = query.trim().toLowerCase();
 
     if (!search) return allRows;
 
     return allRows.filter((row) =>
-      `${row.title} ${row.subtitle} ${row.value} ${row.meta}`
+      `${row.key} ${row.title} ${row.subtitle} ${row.value} ${row.meta}`
         .toLowerCase()
         .includes(search)
     );
