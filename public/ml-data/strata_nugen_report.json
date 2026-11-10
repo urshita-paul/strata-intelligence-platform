@@ -1,0 +1,67 @@
+﻿{
+    "executive_summary":  "This report provides a historical analysis of air pollution data from 10 stations in Delhi, India, from November 8 to November 14, 2024. The analysis reveals significant discrepancies between observed and predicted PM2.5 levels, with a mean absolute error of 15.92. The top 3 stations with the highest observed PM2.5 levels were Shadipur, NSIT Dwarka, and North Campus, while the top 3 prediction errors were ITO, IHBAS, and Pusa. The model\u0027s R2 value indicates that 92.25% of the variability in observed PM2.5 levels can be explained by the model, but this does not imply accuracy. The analysis highlights the need for further evaluation of model performance and the importance of considering regional exposure and pollution source attribution.",
+    "hotspot_analysis":  {
+                             "top_3_observed_stations":  [
+                                                             {
+                                                                 "station_id":  "site_113",
+                                                                 "station_name":  "Shadipur, Delhi - CPCB",
+                                                                 "ground_PM2.5_mean":  240.2828354978,
+                                                                 "absolute_error":  5.3902754978
+                                                             },
+                                                             {
+                                                                 "station_id":  "site_115",
+                                                                 "station_name":  "NSIT Dwarka, Delhi - CPCB",
+                                                                 "ground_PM2.5_mean":  234.4345915926,
+                                                                 "absolute_error":  7.1499415926
+                                                             },
+                                                             {
+                                                                 "station_id":  "site_105",
+                                                                 "station_name":  "North Campus, DU, Delhi - IMD",
+                                                                 "ground_PM2.5_mean":  230.9573524845,
+                                                                 "absolute_error":  7.4039024845
+                                                             }
+                                                         ],
+                             "top_3_prediction_errors":  [
+                                                             {
+                                                                 "station_id":  "site_117",
+                                                                 "station_name":  "ITO, Delhi - CPCB",
+                                                                 "ground_PM2.5_mean":  221.5832088745,
+                                                                 "predicted_PM25":  189.5803,
+                                                                 "absolute_error":  32.0029088745
+                                                             },
+                                                             {
+                                                                 "station_id":  "site_114",
+                                                                 "station_name":  "IHBAS, Dilshad Garden, Delhi - CPCB",
+                                                                 "ground_PM2.5_mean":  151.8933874459,
+                                                                 "predicted_PM25":  124.87552,
+                                                                 "absolute_error":  27.0178674459
+                                                             },
+                                                             {
+                                                                 "station_id":  "site_107",
+                                                                 "station_name":  "Pusa, Delhi - DPCC",
+                                                                 "ground_PM2.5_mean":  204.5008333333,
+                                                                 "predicted_PM25":  188.43515,
+                                                                 "absolute_error":  16.0656833333
+                                                             }
+                                                         ]
+                         },
+    "model_reliability_analysis":  {
+                                       "R2":  0.9225506428,
+                                       "RMSE":  21.3440169842,
+                                       "MAE":  15.9201497644,
+                                       "bias":  -1.8439620231
+                                   },
+    "environmental_interpretation":  "ITO, IHBAS and Pusa show notable underpredictions in the supplied historical sample. These discrepancies warrant further station-level validation, but do not establish persistent model unreliability or identify pollution causes.",
+    "monitoring_recommendations":  [
+                                       "Increase model training data to improve performance, particularly for underpredicted stations.",
+                                       "Consider incorporating regional exposure and pollution source attribution into the model.",
+                                       "Regularly review and update the model to ensure it remains accurate and reliable."
+                                   ],
+    "uncertainty_and_limitations":  [
+                                        "Historical evaluation, not a live forecast.",
+                                        "R2 is not an accuracy percentage.",
+                                        "Station averages do not establish regional exposure.",
+                                        "No station-level fire, weather, satellite, or SHAP evidence is included in this export.",
+                                        "Do not infer pollution source attribution."
+                                    ]
+}

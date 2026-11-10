@@ -1,0 +1,104 @@
+{
+  "event_id": "STRATA-2024-NOV08-14",
+  "region": "Monitored stations in the STRATA study area",
+  "observation_period": {
+    "start": "2024-11-08",
+    "end": "2024-11-14"
+  },
+  "data_status": "historical_model_output",
+  "model": {
+    "name": "XGBoost",
+    "feature_set": "forecast_prior_only",
+    "evaluation": {
+      "feature_set": "forecast_prior_only",
+      "case_definition": "exact_week_2024-11-08_to_2024-11-14",
+      "n": 91,
+      "MAE": 15.9201497644,
+      "RMSE": 21.3440169842,
+      "R2": 0.9225506428,
+      "bias": -1.8439620231
+    }
+  },
+  "station_count": 91,
+  "observed_pm25_mean_ugm3": 154.41975569813678,
+  "predicted_pm25_mean_ugm3": 152.5757937252747,
+  "stations": [
+    {
+      "station_id": "site_104",
+      "station_name": "Burari Crossing, Delhi - IMD",
+      "ground_PM2.5_mean": 222.3377380952,
+      "predicted_PM25": 226.06752,
+      "absolute_error": 3.7297819048
+    },
+    {
+      "station_id": "site_105",
+      "station_name": "North Campus, DU, Delhi - IMD",
+      "ground_PM2.5_mean": 230.9573524845,
+      "predicted_PM25": 223.55345,
+      "absolute_error": 7.4039024845
+    },
+    {
+      "station_id": "site_106",
+      "station_name": "IGI Airport (T3), Delhi - IMD",
+      "ground_PM2.5_mean": 227.9692468944,
+      "predicted_PM25": 225.94997,
+      "absolute_error": 2.0192768944
+    },
+    {
+      "station_id": "site_107",
+      "station_name": "Pusa, Delhi - DPCC",
+      "ground_PM2.5_mean": 204.5008333333,
+      "predicted_PM25": 188.43515,
+      "absolute_error": 16.0656833333
+    },
+    {
+      "station_id": "site_108",
+      "station_name": "Aya Nagar, Delhi - IMD",
+      "ground_PM2.5_mean": 222.9324242424,
+      "predicted_PM25": 218.52324,
+      "absolute_error": 4.4091842424
+    },
+    {
+      "station_id": "site_109",
+      "station_name": "Lodhi Road, Delhi - IMD",
+      "ground_PM2.5_mean": 174.1223015873,
+      "predicted_PM25": 174.10205,
+      "absolute_error": 0.0202515873
+    },
+    {
+      "station_id": "site_113",
+      "station_name": "Shadipur, Delhi - CPCB",
+      "ground_PM2.5_mean": 240.2828354978,
+      "predicted_PM25": 234.89256,
+      "absolute_error": 5.3902754978
+    },
+    {
+      "station_id": "site_114",
+      "station_name": "IHBAS, Dilshad Garden, Delhi - CPCB",
+      "ground_PM2.5_mean": 151.8933874459,
+      "predicted_PM25": 124.87552,
+      "absolute_error": 27.0178674459
+    },
+    {
+      "station_id": "site_115",
+      "station_name": "NSIT Dwarka, Delhi - CPCB",
+      "ground_PM2.5_mean": 234.4345915926,
+      "predicted_PM25": 227.28465,
+      "absolute_error": 7.1499415926
+    },
+    {
+      "station_id": "site_117",
+      "station_name": "ITO, Delhi - CPCB",
+      "ground_PM2.5_mean": 221.5832088745,
+      "predicted_PM25": 189.5803,
+      "absolute_error": 32.0029088745
+    }
+  ],
+  "limitations": [
+    "Historical evaluation, not a live forecast",
+    "R2 is not an accuracy percentage",
+    "Station averages do not establish regional exposure",
+    "No station-level fire, weather, satellite or SHAP evidence is included in this export",
+    "Do not infer pollution source attribution"
+  ]
+}
