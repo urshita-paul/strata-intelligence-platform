@@ -53,9 +53,14 @@ type Fire = {
 };
 
 // Calculate percentage deviation from the historical baseline.
+// Negative retrievals are excluded from percentage calculations.
 const getPercentageDeviation = (
   point: SatellitePoint
 ): number | null => {
+  if (point.negative_retrieval) {
+    return null;
+  }
+
   const baselineMean = point.baseline_mean;
   const difference = point.anomaly_difference;
 
@@ -76,6 +81,10 @@ const getPercentageDeviation = (
 const formatPercentageDeviation = (
   point: SatellitePoint
 ): string => {
+  if (point.negative_retrieval) {
+    return "Not calculated — negative retrieval";
+  }
+
   const deviation = getPercentageDeviation(point);
 
   if (deviation === null) {
@@ -268,20 +277,10 @@ function WarningsPage() {
     station.coverage_flag?.startsWith("low_coverage")
   ).length;
 
-  const observations = stations.reduce(
-    (total, station) => total + station.n,
-    0
-  );
-
   const maxFrp =
     fires.length > 0
       ? Math.max(...fires.map((fire) => fire.frp))
       : null;
-
-  const abovePercentage =
-    scoredPoints > 0
-      ? (aboveBaseline / scoredPoints) * 100
-      : 0;
 
   // --------------------------------------------------
   // BUILD OBSERVATION LIST
@@ -308,8 +307,9 @@ function WarningsPage() {
     if (dataset === "Sentinel-5P") {
       return [...satellitePoints]
 
-        // Sort by absolute percentage deviation,
-        // not by absolute Z-score.
+        // Valid percentage deviations appear first.
+        // Negative retrievals and unavailable percentages
+        // are placed at the bottom.
         .sort((a, b) => {
           const deviationA = getPercentageDeviation(a);
           const deviationB = getPercentageDeviation(b);
@@ -340,14 +340,17 @@ function WarningsPage() {
 
             location: `${point.grid_lat.toFixed(4)}, ${point.grid_lon.toFixed(4)}`,
 
-            value:
-              deviation === null
+            value: point.negative_retrieval
+              ? "Negative retrieval · % not calculated"
+              : deviation === null
                 ? "Percentage deviation unavailable"
                 : `${deviation > 0 ? "+" : ""}${deviation.toFixed(2)}% vs baseline`,
 
-            context: point.anomaly_direction
+            context: `${point.anomaly_direction
               ? point.anomaly_direction.replaceAll("_", " ")
-              : "Direction unavailable",
+              : "Direction unavailable"}${point.negative_retrieval
+              ? " · negative retrieval flagged"
+              : ""}`,
 
             record: point,
           };
@@ -863,11 +866,12 @@ function WarningsPage() {
                       <p className="text-xs leading-relaxed text-muted-foreground">
                         Percentage deviation compares the satellite
                         column measurement with its historical baseline.
-                        The Z-score is retained as a secondary diagnostic,
-                        but its reliability is limited by the small number
-                        of annual baseline samples. Sentinel-5P column
-                        measurements are not direct ground-level pollution
-                        measurements.
+                        Negative retrievals are retained for inspection
+                        but excluded from percentage calculations and
+                        ranking. The Z-score is a secondary diagnostic
+                        with limited historical baseline support.
+                        Sentinel-5P column measurements are not direct
+                        ground-level pollution measurements.
                       </p>
 
                     </div>
@@ -1036,7 +1040,9 @@ function WarningsPage() {
 
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               Records are ordered by absolute percentage deviation
-              from the historical baseline. Above-baseline and
+              among valid, non-negative retrievals. Negative retrievals
+              are retained for review but excluded from percentage
+              calculations and ranking. Above-baseline and
               below-baseline observations are both shown. This is
               a relative comparison, not a pollution-risk ranking.
               Satellite column measurements are not direct
