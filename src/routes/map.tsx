@@ -1,7 +1,7 @@
-
 import { lazy, Suspense } from "react";
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel } from "@/components/strata/ui";
+import { MapPinned } from "lucide-react";
+import { PageHeader } from "@/components/strata/ui";
 
 const RealDataMap = lazy(() => import("@/components/strata/RealDataMap"));
 
@@ -9,38 +9,23 @@ export const Route = createFileRoute("/map")({
   head: () => ({
     meta: [
       { title: "Environmental Intelligence Map — STRATA" },
-      {
-        name: "description",
-        content: "Historical environmental intelligence map with CPCB, Sentinel-5P and VIIRS datasets.",
-      },
+      { name: "description", content: "Explore CPCB stations, Sentinel-5P grid observations and VIIRS detections in an interactive historical intelligence map." },
+      { property: "og:title", content: "Environmental Intelligence Map — STRATA" },
+      { property: "og:description", content: "A multi-source geospatial workspace for historical environmental observations." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: MapPage,
 });
 
 function MapLoading() {
-  return (
-    <div className="flex h-full min-h-[390px] items-center justify-center rounded-md bg-surface text-sm text-muted-foreground">
-      Loading environmental intelligence map…
-    </div>
-  );
+  return <div className="panel-frame flex min-h-[620px] items-center justify-center rounded-lg text-sm text-muted-foreground"><div className="flex items-center gap-2"><MapPinned className="h-5 w-5 animate-pulse text-primary" />Loading geospatial workspace…</div></div>;
 }
 
 function MapPage() {
-  return (
-    <>
-      <PageHeader
-        title="Environmental Intelligence Map"
-        subtitle="Historical pollution and fire observations across the study region"
-      />
-
-      <Panel title="Multi-source geospatial intelligence" simulated={false}>
-        <ClientOnly fallback={<MapLoading />}>
-          <Suspense fallback={<MapLoading />}>
-            <RealDataMap />
-          </Suspense>
-        </ClientOnly>
-      </Panel>
-    </>
-  );
+  return <>
+    <PageHeader eyebrow="Multi-source geospatial intelligence" title="Environmental Intelligence Map" subtitle="Investigate historical ground measurements, atmospheric grid observations and satellite fire detections in their geographic context." />
+    <ClientOnly fallback={<MapLoading />}><Suspense fallback={<MapLoading />}><RealDataMap /></Suspense></ClientOnly>
+  </>;
 }

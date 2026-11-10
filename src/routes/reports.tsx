@@ -1,18 +1,19 @@
 
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileText, Printer, Sparkles } from "lucide-react";
+import { Activity, CheckCircle2, Clock3, Database, FileCheck2, FileText, Flame, Printer, Satellite } from "lucide-react";
 import { toast } from "sonner";
 import type { Station } from "@/components/strata/LiveDashboardMap";
 import {
+  DatasetBadge,
+  EmptyState,
   PageHeader,
   Panel,
   StatCard,
+  StatusNotice,
 } from "@/components/strata/ui";
 
-const API =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000";
+const API = import.meta.env["VITE_API_BASE_URL"] || "http://127.0.0.1:8000";
 
 type ReportKind =
   | "Multi-source Summary"
@@ -233,7 +234,7 @@ function createReportHtml(snapshot: ReportSnapshot): string {
               ["VIIRS RECORDS", numberFormat(fires.length)],
               ["AVERAGE FRP", averageFrp === null ? "—" : numberFormat(averageFrp, 2), "MW"],
               ["MAXIMUM FRP", maxFrp === null ? "—" : numberFormat(maxFrp, 2), "MW"],
-              ["HIGH CONFIDENCE", numberFormat(confidenceCounts.High ?? 0)],
+              ["HIGH CONFIDENCE", numberFormat(confidenceCounts["High"] ?? 0)],
             ];
 
   const cpcbSection = `
@@ -355,16 +356,16 @@ function createReportHtml(snapshot: ReportSnapshot): string {
   };
 
   const confidenceSection = confidenceOrder
-    .filter((label) => confidenceCounts[label] > 0)
+    .filter((label) => (confidenceCounts[label] ?? 0) > 0)
     .map((label) => {
-      const count = confidenceCounts[label];
+      const count = confidenceCounts[label] ?? 0;
       const percentage =
         fires.length > 0 ? (count / fires.length) * 100 : 0;
 
       return `
         <div class="bar-row">
           <div class="bar-label"><span>${label}</span><strong>${numberFormat(count)}</strong></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${percentage.toFixed(1)}%;background:${confidenceColors[label]}"></div></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${percentage.toFixed(1)}%;background:${confidenceColors[label] ?? "#94A3B8"}"></div></div>
         </div>
       `;
     })
@@ -738,6 +739,9 @@ export const Route = createFileRoute("/reports")({
           "Professionally formatted environmental reports based on CPCB, Sentinel-5P and VIIRS observations.",
       },
       { property: "og:title", content: "Environmental Reports — STRATA" },
+      { property: "og:description", content: "Generate polished standalone HTML reports and print-ready PDFs from historical environmental observations." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ReportsPage,
@@ -747,318 +751,101 @@ function ReportsPage() {
   const [date, setDate] = useState("2024-11-17");
   const [pollutant, setPollutant] = useState("PM2.5");
   const [kind, setKind] = useState<ReportKind>("Multi-source Summary");
-
   const [stations, setStations] = useState<Station[]>([]);
-  const [satellitePoints, setSatellitePoints] =
-    useState<SatellitePoint[]>([]);
+  const [satellitePoints, setSatellitePoints] = useState<SatellitePoint[]>([]);
   const [fires, setFires] = useState<Fire[]>([]);
-
   const [reports, setReports] = useState<GeneratedReport[]>([]);
   const [selectedId, setSelectedId] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
-
     async function loadData() {
       setLoading(true);
       setError("");
-
       try {
         const responses = await Promise.all([
-          fetch(
-            `${API}/api/cpcb?date=${date}&pollutant=${encodeURIComponent(pollutant)}`,
-            { signal: controller.signal }
-          ),
-          fetch(
-            `${API}/api/satellite?pollutant=NO2&window_id=11-12`,
-            { signal: controller.signal }
-          ),
-          fetch(
-            `${API}/api/fires?date=${date}`,
-            { signal: controller.signal }
-          ),
+          fetch(`${API}/api/cpcb?date=${date}&pollutant=${encodeURIComponent(pollutant)}`, { signal: controller.signal }),
+          fetch(`${API}/api/satellite?pollutant=NO2&window_id=11-12`, { signal: controller.signal }),
+          fetch(`${API}/api/fires?date=${date}`, { signal: controller.signal }),
         ]);
-
-        if (responses.some((response) => !response.ok)) {
-          throw new Error("One or more dataset requests failed.");
-        }
-
-        const cpcbData = (await responses[0].json()) as {
-          stations?: Station[];
-        };
-
-        const satelliteData = (await responses[1].json()) as {
-          points?: SatellitePoint[];
-        };
-
-        const fireData = (await responses[2].json()) as {
-          detections?: Fire[];
-        };
-
+        if (responses.some((response) => !response.ok)) throw new Error("One or more dataset requests failed.");
+        const cpcbData = (await responses[0].json()) as { stations?: Station[] };
+        const satelliteData = (await responses[1].json()) as { points?: SatellitePoint[] };
+        const fireData = (await responses[2].json()) as { detections?: Fire[] };
         setStations(cpcbData.stations ?? []);
         setSatellitePoints(satelliteData.points ?? []);
         setFires(fireData.detections ?? []);
       } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          return;
-        }
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load report source data."
-        );
+        if (err instanceof Error && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Unable to load report source data.");
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
-
-    loadData();
-
+    void loadData();
     return () => controller.abort();
   }, [date, pollutant]);
 
   const generateReport = () => {
     const created = new Date().toISOString();
-    const id = `STR-${date.replaceAll("-", "")}-${Date.now()
-      .toString()
-      .slice(-5)}`;
-
-    const snapshot: ReportSnapshot = {
-      stations,
-      satellitePoints,
-      fires,
-      observationDate: date,
-      pollutant,
-      kind,
-      id,
-      created,
-    };
-
-    const report: GeneratedReport = {
-      id,
-      title: `${kind} — ${date}`,
-      kind,
-      date,
-      created,
-      html: createReportHtml(snapshot),
-    };
-
+    const id = `STR-${date.replaceAll("-", "")}-${Date.now().toString().slice(-5)}`;
+    const snapshot: ReportSnapshot = { stations, satellitePoints, fires, observationDate: date, pollutant, kind, id, created };
+    const report: GeneratedReport = { id, title: `${kind} — ${date}`, kind, date, created, html: createReportHtml(snapshot) };
     setReports((current) => [report, ...current]);
     setSelectedId(report.id);
     toast.success("Environmental report generated");
   };
-
-  const current = reports.find(
-    (report) => report.id === selectedId
-  );
-
+  const current = reports.find((report) => report.id === selectedId);
   const printReport = () => {
     if (!current) return;
-
-    const printWindow = window.open(
-      "",
-      "_blank",
-      "width=1000,height=800"
-    );
-
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
     if (!printWindow) {
       toast.error("Please allow pop-ups to export the report.");
       return;
     }
-
     printWindow.document.open();
     printWindow.document.write(current.html);
     printWindow.document.close();
     printWindow.focus();
-
-    window.setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    window.setTimeout(() => printWindow.print(), 500);
   };
 
-  return (
-    <>
-      <PageHeader
-        title="Environmental Reports"
-        subtitle="Prepare and export structured reports from historical environmental observations"
-      />
+  return <>
+    <PageHeader eyebrow="Environmental intelligence reporting" title="Reports & Export" subtitle="Turn actual historical observations into polished standalone HTML documents and print-ready PDF reports, with methodology and limitations included." actions={<span className="inline-flex items-center gap-2 rounded-md border bg-surface/60 px-3 py-2 text-xs text-muted-foreground"><FileCheck2 className="h-4 w-4 text-primary" />A4 · Standalone document</span>} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard
-          label="CPCB Stations"
-          value={String(stations.length)}
-          delta={`${pollutant} · ${date}`}
-        />
-        <StatCard
-          label="Sentinel-5P Grid"
-          value={String(satellitePoints.length)}
-          delta="Composite-period observations"
-        />
-        <StatCard
-          label="VIIRS Detections"
-          value={String(fires.length)}
-          delta={`Historical records · ${date}`}
-        />
-      </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <StatCard label="CPCB Stations" value={String(stations.length)} delta={`${pollutant} · ${date}`} icon={<Activity className="h-4 w-4" />} accent="primary" loading={loading} />
+      <StatCard label="Sentinel-5P Grid" value={String(satellitePoints.length)} delta="Composite-period observations" icon={<Satellite className="h-4 w-4" />} accent="satellite" loading={loading} />
+      <StatCard label="VIIRS Detections" value={String(fires.length)} delta={`Historical records · ${date}`} icon={<Flame className="h-4 w-4" />} accent="fire" loading={loading} />
+    </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <Panel title="Report configuration" simulated={false}>
-            <label className="text-xs text-muted-foreground">
-              Report type
-            </label>
-            <select
-              value={kind}
-              onChange={(event) =>
-                setKind(event.target.value as ReportKind)
-              }
-              className="mb-3 mt-1 h-9 w-full rounded-md border bg-surface px-2 text-sm"
-            >
-              {REPORT_TYPES.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
+    <div className="mt-4 grid items-start gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
+      <div className="space-y-4">
+        <Panel title="Report configuration" description="Select the source records and document scope">
+          <div className="mb-5 grid grid-cols-3 gap-1 text-center text-[9px] uppercase tracking-wider text-muted-foreground"><div className="rounded-sm bg-primary/10 px-1 py-2 text-primary">01 Configure</div><div className="rounded-sm bg-surface px-1 py-2">02 Generate</div><div className="rounded-sm bg-surface px-1 py-2">03 Export</div></div>
+          <div className="space-y-3">
+            <label className="control-label">Report type<select value={kind} onChange={(event) => setKind(event.target.value as ReportKind)} className="control-input w-full">{REPORT_TYPES.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label className="control-label">Observation date<input type="date" value={date} min="2024-11-09" max="2024-11-17" onChange={(event) => setDate(event.target.value)} className="control-input w-full" /></label>
+            <label className="control-label">CPCB pollutant<select value={pollutant} onChange={(event) => setPollutant(event.target.value)} className="control-input w-full"><option>PM2.5</option><option>PM10</option><option>NO2</option><option>CO</option></select></label>
+          </div>
+          <div className="mt-4 rounded-lg border bg-surface/50 p-3"><div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><Database className="h-3.5 w-3.5" />Source data readiness</div><div className="space-y-2">{(["CPCB", "Sentinel-5P", "VIIRS"] as const).map((source) => <div key={source} className="flex items-center justify-between gap-2"><DatasetBadge dataset={source} />{loading ? <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><Clock3 className="h-3 w-3" />Loading</span> : error ? <span className="text-[10px] text-critical">Unavailable</span> : <span className="flex items-center gap-1 text-[10px] text-success"><CheckCircle2 className="h-3 w-3" />Ready</span>}</div>)}</div></div>
+          {error && <StatusNotice tone="error" title="Source data unavailable" className="mt-3">{error}</StatusNotice>}
+          <button onClick={generateReport} disabled={loading || Boolean(error)} className="primary-button mt-4 w-full"><FileText className="h-4 w-4" />Generate report</button>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">Uses actual dataset records. No unsupported predictions, causal conclusions or AI-generated assessment.</p>
+        </Panel>
 
-            <label className="text-xs text-muted-foreground">
-              Observation date
-            </label>
-            <input
-              type="date"
-              value={date}
-              min="2024-11-09"
-              max="2024-11-17"
-              onChange={(event) => setDate(event.target.value)}
-              className="mb-3 mt-1 h-9 w-full rounded-md border bg-surface px-2 text-sm"
-            />
-
-            <label className="text-xs text-muted-foreground">
-              CPCB pollutant
-            </label>
-            <select
-              value={pollutant}
-              onChange={(event) => setPollutant(event.target.value)}
-              className="mt-1 h-9 w-full rounded-md border bg-surface px-2 text-sm"
-            >
-              <option>PM2.5</option>
-              <option>PM10</option>
-              <option>NO2</option>
-              <option>CO</option>
-            </select>
-
-            {loading && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Loading source datasets...
-              </p>
-            )}
-
-            {error && (
-              <div className="mt-3 rounded-md border border-red-500/40 p-2 text-xs text-red-400">
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={generateReport}
-              disabled={loading || Boolean(error)}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate report
-            </button>
-
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Generates a formatted report from actual dataset records.
-              No unsupported predictions or causal conclusions.
-            </p>
-          </Panel>
-
-          <Panel title="Report library" simulated={false}>
-            {reports.length === 0 ? (
-              <div className="py-7 text-center text-sm text-muted-foreground">
-                <FileText className="mx-auto mb-2 h-7 w-7 opacity-50" />
-                No reports generated yet.
-                <p className="mt-1 text-xs">
-                  Your generated reports will appear here.
-                </p>
-              </div>
-            ) : (
-              <ul className="max-h-[460px] space-y-1 overflow-y-auto">
-                {reports.map((report) => (
-                  <li key={report.id}>
-                    <button
-                      onClick={() => setSelectedId(report.id)}
-                      className={`w-full rounded-md border px-2.5 py-2 text-left ${
-                        report.id === selectedId
-                          ? "border-primary bg-primary/10"
-                          : "border-transparent hover:bg-accent"
-                      }`}
-                    >
-                      <div className="font-mono text-[10px] text-muted-foreground">
-                        {report.id}
-                      </div>
-                      <div className="mt-1 text-sm">
-                        {report.title}
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {report.kind}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p className="mt-3 border-t pt-3 text-[11px] text-muted-foreground">
-              Reports are stored in the current browser session.
-              Persistent storage is not connected.
-            </p>
-          </Panel>
-        </div>
-
-        <Panel
-          title="Report preview"
-          simulated={false}
-          action={
-            current ? (
-              <button
-                onClick={printReport}
-                className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs hover:border-primary"
-              >
-                <Printer className="h-4 w-4" />
-                Export PDF / Print
-              </button>
-            ) : undefined
-          }
-        >
-          {!current ? (
-            <div className="flex min-h-[650px] flex-col items-center justify-center text-center">
-              <FileText className="mb-3 h-10 w-10 text-muted-foreground opacity-50" />
-              <h2 className="text-lg font-semibold">
-                Your report preview will appear here
-              </h2>
-              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Configure your report and generate it to see the
-                formatted document.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-md border bg-[#e8eef0] p-2">
-              <iframe
-                key={current.id}
-                srcDoc={current.html}
-                title={`Preview of ${current.title}`}
-                className="h-[1100px] w-full rounded-sm bg-white"
-              />
-            </div>
-          )}
+        <Panel title="Report library" description={`${reports.length} document${reports.length === 1 ? "" : "s"} in this session`} contentClassName="p-3 sm:p-3">
+          {reports.length === 0 ? <EmptyState icon={<FileText className="h-5 w-5" />} title="No reports yet" description="Generated reports will appear here for preview and export." className="min-h-44" /> : <ul className="max-h-[420px] space-y-1.5 overflow-y-auto">{reports.map((report) => <li key={report.id}><button onClick={() => setSelectedId(report.id)} className={`w-full rounded-md border px-3 py-3 text-left transition-colors ${report.id === selectedId ? "border-primary/50 bg-primary/[0.08]" : "border-border/60 bg-surface/35 hover:bg-accent/50"}`}><div className="font-mono text-[9px] text-muted-foreground">{report.id}</div><div className="mt-1.5 text-xs font-medium leading-relaxed">{report.title}</div><div className="mt-1 text-[10px] text-muted-foreground">{report.kind}</div></button></li>)}</ul>}
+          <p className="mt-3 border-t pt-3 text-[10px] leading-relaxed text-muted-foreground">Reports remain in browser memory for this session. Persistent storage is not connected.</p>
         </Panel>
       </div>
-    </>
-  );
+
+      <Panel title="Document preview" description={current ? `${current.id} · ${current.kind}` : "The generated A4 report will appear here"} action={current ? <button onClick={printReport} className="secondary-button min-h-9 text-[11px]"><Printer className="h-4 w-4" />Export PDF / Print</button> : undefined} contentClassName="p-3 sm:p-3">
+        {!current ? <EmptyState icon={<FileText className="h-6 w-6" />} title="Your report preview will appear here" description="Configure the document, wait for all three sources to be ready, then select Generate report." className="min-h-[720px] rounded-lg border border-dashed bg-surface/25" /> : <div className="overflow-hidden rounded-lg border bg-surface p-2 shadow-[var(--shadow-panel)]"><iframe key={current.id} srcDoc={current.html} title={`Preview of ${current.title}`} className="h-[1100px] w-full rounded-sm bg-panel" /></div>}
+      </Panel>
+    </div>
+    <StatusNotice className="mt-4" title="Document methodology">Every report includes its observation period, measurement units, source context and limitations. Export opens the same standalone document in a print window; use the browser’s Save as PDF option.</StatusNotice>
+  </>;
 }
